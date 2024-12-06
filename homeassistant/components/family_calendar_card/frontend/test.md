@@ -1,35 +1,37 @@
-# Git Workflow
+Important Notes:
+    Never push to home-assistant/core
+    Always push to your fork (origin)
+    Pull from upstream (home-assistant/core) using rebase
+    Only force push when necessary (after rebase)
 
-## Initial Setup
-```bash
-git config pull.rebase true
-```
+Initial Setup:
+    Configure git settings:
+        git config --global pull.rebase true
+        git config --global cursor.rebase true
+        git config --global cursor.autostash true
 
-## Regular Workflow
+    Check your settings:
+        git config --list
 
-### 1. Getting Updates from Home Assistant
-```bash
-git pull --rebase upstream dev
-```
+Regular Workflow:
+    Get updates from Home Assistant:
+        git pull --rebase upstream dev
 
-### 2. Pushing Changes to Your Fork
-```bash
-git push origin feature/family-calendar-card
-```
+    Push your changes to your fork:
+        git push origin feature/family-calendar-card
 
-### 3. Force Push (if needed after rebase)
-```bash
-git push -f origin feature/family-calendar-card
-```
+    If needed, force push after rebase:
+        git push -f origin feature/family-calendar-card
 
-## Notes
-- Never push directly to `home-assistant/core`
-- Always push to your own fork (`origin`)
-- Pull from upstream (`home-assistant/core`) using rebase
-- Force push only when necessary (after rebasing)
+    Make sure branch tracks your fork:
+        git branch --set-upstream-to=origin/feature/family-calendar-card feature/family-calendar-card
 
-## Common Issues
-If you see "divergent branches" message, use the rebase approach:
-```bash
-git pull --rebase upstream dev
-```
+    Check tracking with:
+        git branch -vv
+
+Common Issues:
+    If you see "divergent branches":
+        git pull --rebase upstream dev
+
+    If push is rejected (non-fast-forward):
+        git push -f origin feature/family-calendar-card
