@@ -192,7 +192,7 @@ export class FamilyCalendarCard extends LitElement {
       min-height: 40px;
       background: white;
       z-index: 3;
-      border-bottom: 2px solid #e0e0e0;
+      border-bottom: 4px solid #e0e0e0;
       padding: 4px 0;
       display: flex;
       flex-direction: column;
@@ -561,9 +561,9 @@ export class FamilyCalendarCard extends LitElement {
       return html``;
     }
 
-    const timeSlots = Array.from({ length: 24 }, (_, i) => {
-      const hour = i % 12 || 12;
-      const meridiem = i < 12 ? "am" : "pm";
+    const timeSlots = Array.from({ length: 23 }, (_, i) => {
+      const hour = (i + 1) % 12 || 12;
+      const meridiem = i < 11 ? "am" : "pm";
       return `${hour} ${meridiem}`;
     });
 
@@ -578,7 +578,7 @@ export class FamilyCalendarCard extends LitElement {
           <div class="time-column">
             ${timeSlots.map(
               (time, i) => html`
-                <div class="time-slot" style="top: ${100 + i * 100}px">
+                <div class="time-slot" style="top: ${100 + i * 100 + 50}px">
                   ${time}
                 </div>
               `,
