@@ -18,10 +18,10 @@ Regular Workflow:
         git pull --rebase upstream dev
 
     Push your changes to your fork:
-        git push origin feature/family-calendar-card
+        git push origin feature/family-calendar-card-new
 
     If needed, force push after rebase:
-        git push -f origin feature/family-calendar-card
+        git push -f origin feature/family-calendar-card-new
 
     Make sure branch tracks your fork:
         git branch --set-upstream-to=origin/feature/family-calendar-card feature/family-calendar-card
