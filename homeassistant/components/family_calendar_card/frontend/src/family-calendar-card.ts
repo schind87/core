@@ -128,7 +128,8 @@ export class FamilyCalendarCard extends LitElement {
       flex: 1;
       min-height: 700px;
       height: 100%;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .calendar-container {
@@ -146,7 +147,63 @@ export class FamilyCalendarCard extends LitElement {
     swiper-slide {
       width: 20%;
       height: 100%;
-      overflow-y: auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .day-card {
+      height: 2400px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .day-header {
+      position: sticky;
+      top: 0;
+      height: 50px;
+      background: white;
+      text-align: left;
+      padding: 8px 16px;
+      font-size: 42px;
+      font-weight: 500;
+      color: #000000;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .all-day-section {
+      position: sticky;
+      top: 50px;
+      min-height: 40px;
+      background: white;
+      z-index: 3;
+      padding: 4px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meal-plan-section {
+      position: sticky;
+      top: 90px;
+      min-height: 40px;
+      background: white;
+      z-index: 3;
+      border-bottom: 2px solid #e0e0e0;
+      padding: 4px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-right: 1px solid #e0e0e0;
+    }
+
+    .hourly-section {
+      position: relative;
+      flex: 1;
+      border-right: 1px solid #e0e0e0;
     }
 
     .time-column {
@@ -156,8 +213,8 @@ export class FamilyCalendarCard extends LitElement {
       background: white;
       z-index: 3;
       font-weight: 500;
-      height: calc(100% - 80px);
-      margin-top: 80px;
+      height: calc(100% - 130px);
+      margin-top: 130px;
     }
 
     .time-slot {
@@ -166,31 +223,9 @@ export class FamilyCalendarCard extends LitElement {
       font-size: 24px;
       color: #000000;
       white-space: nowrap;
-      transform: translateY(-50%);
-      line-height: 1;
-    }
-
-    .day-card {
-      height: 2400px;
-      position: relative;
-      border-left: 1px solid #e0e0e0;
-    }
-
-    .day-header {
-      position: sticky;
-      top: 0;
-      height: 80px;
-      background: white;
-      text-align: left;
-      padding: 24px 16px;
-      font-size: 42px;
-      font-weight: 500;
-      color: #000000;
-      z-index: 2;
-      border-bottom: 1px solid #e0e0e0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
+      height: 24px;
+      line-height: 24px;
+      margin-top: -12px; /* Center the time label */
     }
 
     .hour-line {
@@ -216,23 +251,30 @@ export class FamilyCalendarCard extends LitElement {
       background-color: #a4d8f9;
       display: flex;
       flex-direction: column;
-      z-index: 2;
+      z-index: 1;
+    }
+
+    .event.meal-plan,
+    .event.all-day {
+      height: 32px;
+      font-size: 22px;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+      margin: 0 4px;
+      border-radius: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 22px;
     }
 
     .event.meal-plan {
-      top: 0;
-      height: 32px;
       background-color: #ffe5d9;
-      margin-top: 80px;
-      padding: 4px 12px;
-      font-size: 22px;
-      display: flex;
-      align-items: center;
-      line-height: 1;
     }
 
-    .event.meal-plan .event-time {
-      display: none; /* Hide time for meal plans */
+    .event.all-day {
+      background-color: #e1e1e1;
     }
 
     .event-icon {
@@ -387,11 +429,12 @@ export class FamilyCalendarCard extends LitElement {
     const endMinutes = event.end.getHours() * 60 + event.end.getMinutes();
     let duration = endMinutes - startMinutes;
 
-    // Ensure minimum 1 hour duration
-    duration = Math.max(duration, 60);
+    // Ensure minimum height
+    duration = Math.max(duration, 30);
 
-    const top = startMinutes;
-    const height = duration;
+    // Convert to pixels (100px per hour = 1.666667px per minute)
+    const top = (startMinutes * 100) / 60 + 80; // Add header height
+    const height = (duration * 100) / 60;
 
     // Get color from Google Calendar colors
     let backgroundColor = "#039be5"; // Default color
@@ -430,11 +473,11 @@ export class FamilyCalendarCard extends LitElement {
 
         const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
         const endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
-        const duration = endMinutes - startMinutes;
+        const duration = Math.max(endMinutes - startMinutes, 30); // Minimum 30 minutes
 
-        // Convert minutes to pixels (100px per hour = 1.667px per minute)
-        const top = startMinutes * (100 / 60);
-        const height = duration * (100 / 60);
+        // Convert to pixels (100px per hour = 1.666667px per minute)
+        const top = (startMinutes * 100) / 60 + 80; // Add header height
+        const height = (duration * 100) / 60;
 
         return html`
           <div
@@ -467,25 +510,50 @@ export class FamilyCalendarCard extends LitElement {
   }
 
   private _getMealPlan(date: Date): TemplateResult | typeof nothing {
-    const day = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const day = date.getDay();
+    const events: string[] = [];
 
     if (day === 2) {
-      // Tuesday
-      return html`
-        <div class="event meal-plan">
-          <span class="event-icon">🌮</span>Tacos
-        </div>
-      `;
+      events.push("Tacos");
     } else if (day === 5) {
-      // Friday
-      return html`
-        <div class="event meal-plan">
-          <span class="event-icon">🍕</span>Pizza
-        </div>
-      `;
+      events.push("Pizza");
     }
 
-    return nothing;
+    if (events.length === 0) {
+      return nothing;
+    }
+
+    return html`
+      ${events.map(
+        (event) => html` <div class="event meal-plan">${event}</div> `,
+      )}
+    `;
+  }
+
+  private _getAllDayEvents(date: Date): TemplateResult | typeof nothing {
+    const day = date.getDay();
+    const events: string[] = [];
+
+    // Example events for different days
+    if (day === 1 || day === 5) {
+      events.push("Game Night");
+    }
+    if (day === 2) {
+      events.push("Holiday");
+    }
+    if (day === 3) {
+      events.push("Book Fair");
+    }
+
+    if (events.length === 0) {
+      return nothing;
+    }
+
+    return html`
+      ${events.map(
+        (event) => html` <div class="event all-day">${event}</div> `,
+      )}
+    `;
   }
 
   render() {
@@ -510,7 +578,9 @@ export class FamilyCalendarCard extends LitElement {
           <div class="time-column">
             ${timeSlots.map(
               (time, i) => html`
-                <div class="time-slot" style="top: ${i * 100}px">${time}</div>
+                <div class="time-slot" style="top: ${100 + i * 100}px">
+                  ${time}
+                </div>
               `,
             )}
           </div>
@@ -535,16 +605,23 @@ export class FamilyCalendarCard extends LitElement {
                           })
                           .replace(",", "")}
                       </div>
-                      ${this._getMealPlan(day)}
-                      ${timeSlots.map(
-                        (_, i) => html`
-                          <div
-                            class="hour-line"
-                            style="top: ${i * 100}px"
-                          ></div>
-                        `,
-                      )}
-                      ${this._getEventsForDay(day)}
+                      <div class="all-day-section">
+                        ${this._getAllDayEvents(day)}
+                      </div>
+                      <div class="meal-plan-section">
+                        ${this._getMealPlan(day)}
+                      </div>
+                      <div class="hourly-section">
+                        ${timeSlots.map(
+                          (_, i) => html`
+                            <div
+                              class="hour-line"
+                              style="top: ${100 + i * 100}px"
+                            ></div>
+                          `,
+                        )}
+                        ${this._getEventsForDay(day)}
+                      </div>
                     </div>
                   </swiper-slide>
                 `,

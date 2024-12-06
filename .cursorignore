@@ -1,0 +1,42 @@
+# Build outputs
+**/dist/
+**/build/
+
+# Dependencies
+**/node_modules/
+
+# Development files
+**/.DS_Store
+**/.env
+**/.env.*
+**/*.log
+
+# Test files
+**/coverage/
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+
+# Temporary files
+**/.tmp/
+**/temp/
+
+# IDE files
+**/.idea/
+**/.vscode/
+**/*.sublime-*
+**/*.swp
+
+# Package files
+**/package-lock.json
+**/yarn.lock
+
+# Generated files
+**/*.min.*
+**/*.map
+
+# Home Assistant specific
+**/generated/
+**/.pytest_cache/
+**/__pycache__/
+**/*.pyc
