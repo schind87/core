@@ -11,7 +11,6 @@ import { HomeAssistant } from "custom-card-helpers";
 import { register } from "swiper/element";
 import type { SwiperContainer, SwiperSlide } from "swiper/element";
 import "swiper/css";
-import { getStyleSheet } from "./common/dom/get_stylesheet";
 
 register(); // Register Swiper custom elements
 
@@ -64,6 +63,30 @@ interface GoogleCalendarColors {
   };
 }
 
+class DateUtils {
+  static getHourRange(startHour: number, endHour: number): number[] {
+    const hours: number[] = [];
+    for (let hour = startHour; hour <= endHour; hour++) {
+      hours.push(hour);
+    }
+    return hours;
+  }
+
+  static getTimeString(date: Date): string {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+
+  static convertTimeToPixels(date: Date, startHour: number): number {
+    const hours = date.getHours() - startHour;
+    const minutes = date.getMinutes();
+    return (hours * 60 + minutes) * (60 / 60); // 60px per hour
+  }
+}
+
 // Define the class first
 @customElement("family-calendar-card")
 export class FamilyCalendarCard extends LitElement {
@@ -77,13 +100,6 @@ export class FamilyCalendarCard extends LitElement {
   @state() private _swiper?: any;
   @state() private _error?: string;
   @state() private _colors?: GoogleCalendarColors;
-
-  private static async _getStyles(): Promise<CSSStyleSheet[]> {
-    const fontSheet = await getStyleSheet(
-      "https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap",
-    );
-    return [fontSheet];
-  }
 
   // Generate time slots in 12-hour format
   private _timeSlots = Array.from({ length: 24 }, (_, i) => {
