@@ -7,7 +7,7 @@
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c --watch",
-    "watch:dev": "npm run build && concurrently \"npm run watch\" \"onchange 'dist/*' -- npm run copy\"",
+    "watch:dev": "npm run build && concurrently \"npm run watch\" \"onchange -t 'dist/*' -- npm run copy\"",
     "copy": "mkdir -p /workspaces/core/config/www/community/family-calendar-card && cp -vf dist/* /workspaces/core/config/www/community/family-calendar-card/"
   },
   "author": "Your Name",
