@@ -522,9 +522,9 @@ export class FamilyCalendarCard extends LitElement {
     const events: string[] = [];
 
     if (day === 2) {
-      events.push("Tacos");
+      events.push("🌮🌮🌮");
     } else if (day === 5) {
-      events.push("Pizza");
+      events.push("🍕🍕🍕");
     }
 
     if (events.length === 0) {
@@ -673,5 +673,8 @@ if (
     type: "family-calendar-card",
     name: "Family Calendar Card",
     description: "A calendar card for family scheduling",
+    version: "__BUILD_VERSION__" as string,
   });
 }
+
+console.info(`Family Calendar Card version __BUILD_VERSION__ loaded`);

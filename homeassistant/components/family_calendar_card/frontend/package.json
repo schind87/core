@@ -1,11 +1,11 @@
 {
   "name": "family-calendar-card",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Family Calendar Card",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "rollup -c",
+    "build": "node build.js && rollup -c && cp -v dist/* /workspaces/core/config/www/community/family-calendar-card/",
     "watch": "rollup -c --watch",
     "watch:dev": "npm run build && concurrently \"npm run watch\" \"onchange -t 'dist/*' -- npm run copy\"",
     "copy": "mkdir -p /workspaces/core/config/www/community/family-calendar-card && cp -vf dist/* /workspaces/core/config/www/community/family-calendar-card/"
@@ -15,21 +15,21 @@
   "dependencies": {
     "custom-card-helpers": "^1.9.0",
     "lit": "^3.0.0",
-    "swiper": "^11.1.15",
-    "lru-cache": "^10.0.0"
+    "lru-cache": "^10.0.0",
+    "swiper": "^11.1.15"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
-    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/node": "^20.0.0",
     "@types/swiper": "^6.0.0",
+    "concurrently": "^8.2.2",
+    "home-assistant-js-websocket": "^9.1.0",
+    "onchange": "^7.1.0",
     "rollup": "^4.0.0",
     "rollup-plugin-css-only": "^4.5.2",
     "tslib": "^2.6.0",
-    "typescript": "^5.0.0",
-    "home-assistant-js-websocket": "^9.1.0",
-    "concurrently": "^8.2.2",
-    "onchange": "^7.1.0"
+    "typescript": "^5.0.0"
   }
 }
