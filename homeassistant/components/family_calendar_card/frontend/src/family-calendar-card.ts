@@ -11,6 +11,7 @@ import { HomeAssistant } from "custom-card-helpers";
 import { register } from "swiper/element";
 import type { SwiperContainer, SwiperSlide } from "swiper/element";
 import "swiper/css";
+import { menuCacheService } from "./menuCacheService";
 
 register(); // Register Swiper custom elements
 
@@ -100,6 +101,7 @@ export class FamilyCalendarCard extends LitElement {
   @state() private _swiper?: any;
   @state() private _error?: string;
   @state() private _colors?: GoogleCalendarColors;
+  @state() private _menuData: any = null;
 
   // Generate time slots in 12-hour format
   private _timeSlots = Array.from({ length: 24 }, (_, i) => {
@@ -290,6 +292,21 @@ export class FamilyCalendarCard extends LitElement {
 
     .event.meal-plan {
       background-color: #ffe5d9;
+      padding: 4px 8px;
+      font-size: 14px;
+      min-height: 32px;
+      overflow: hidden;
+      margin: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      width: calc(100% - 8px);
+    }
+
+    .event.meal-plan.error {
+      background-color: #ffebee;
+      color: #c62828;
     }
 
     .event.all-day {
@@ -306,6 +323,24 @@ export class FamilyCalendarCard extends LitElement {
       opacity: 0.8;
       font-weight: 400;
       margin-top: 4px;
+    }
+
+    .menu-item {
+      white-space: normal;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.2;
+      font-size: 14px;
+      text-align: center;
+      max-height: 2.4em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+
+    .menu-item:not(:last-child) {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      padding-bottom: 2px;
     }
   `;
 
@@ -330,8 +365,30 @@ export class FamilyCalendarCard extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    //    await this._fetchColors();
-    await this._fetchCalendarEvents();
+    await this._initializeCard();
+  }
+
+  private async _initializeCard() {
+    if (!this.config || !this.hass) {
+      console.log("Waiting for config and hass to be ready...");
+      return;
+    }
+
+    try {
+      // Initialize menu cache service
+      await menuCacheService.initializeCache();
+      this._menuData = menuCacheService.getCachedMenu();
+      console.log("Menu data initialized:", this._menuData);
+    } catch (error) {
+      console.error("Error initializing menu data:", error);
+      this._error = "Failed to load menu data";
+    }
+  }
+
+  updated(changedProps: Map<string, any>) {
+    if (changedProps.has("config") || changedProps.has("hass")) {
+      this._initializeCard();
+    }
   }
 
   private async _fetchCalendarEvents() {
@@ -362,7 +419,6 @@ export class FamilyCalendarCard extends LitElement {
             "GET",
             `calendars/${entityId}?start=${start.toISOString()}&end=${end.toISOString()}`,
           );
-          console.log("Calendar API Response:", result);
 
           const calendarEvents = result.map((event) => {
             // Handle potential undefined values
@@ -518,23 +574,26 @@ export class FamilyCalendarCard extends LitElement {
   }
 
   private _getMealPlan(date: Date): TemplateResult | typeof nothing {
-    const day = date.getDay();
-    const events: string[] = [];
-
-    if (day === 2) {
-      events.push("🌮🌮🌮");
-    } else if (day === 5) {
-      events.push("🍕🍕🍕");
+    if (!this._menuData) {
+      console.log("No menu data available yet");
+      return html` <div class="event meal-plan error">Loading menu...</div> `;
     }
 
-    if (events.length === 0) {
+    // Format the date to match the API date format (YYYY-MM-DD)
+    const dateStr = date.toISOString().split("T")[0];
+
+    const dayMenu = this._menuData.find((menu: any) => menu.date === dateStr);
+
+    if (!dayMenu || !dayMenu.items.length) {
       return nothing;
     }
 
     return html`
-      ${events.map(
-        (event) => html` <div class="event meal-plan">${event}</div> `,
-      )}
+      <div class="event meal-plan">
+        ${dayMenu.items.map(
+          (item: string) => html` <div class="menu-item">${item}</div> `,
+        )}
+      </div>
     `;
   }
 
@@ -677,4 +736,4 @@ if (
   });
 }
 
-console.info(`Family Calendar Card version __BUILD_VERSION__ loaded`);
+console.info(`Family Calendar Card 📆 version __BUILD_VERSION__ loaded`);
