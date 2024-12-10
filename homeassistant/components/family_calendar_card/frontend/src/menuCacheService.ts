@@ -46,7 +46,6 @@ class MenuCacheService {
         data,
         lastUpdated: new Date(),
       };
-      console.info("Menu cache updated:", this.cache.lastUpdated);
     } catch (error) {
       console.error("Error refreshing menu cache:", error);
       throw error;

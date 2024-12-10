@@ -3,6 +3,7 @@ import commonjs from "@rollup/plugin-commonjs";
 import typescript from "@rollup/plugin-typescript";
 import replace from "@rollup/plugin-replace";
 import css from "rollup-plugin-css-only";
+import inject from "@rollup/plugin-inject";
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
 
@@ -33,15 +34,15 @@ export default {
     }),
     replace({
       preventAssignment: true,
-      "process.env.NODE_ENV": JSON.stringify("production"),
-      "process.env": JSON.stringify({}),
-      "global.process": JSON.stringify({}),
-      "process.browser": JSON.stringify(true),
-      "process.version": JSON.stringify(""),
-      "process.versions": JSON.stringify({}),
-      __BUILD_VERSION__: `'${fullVersion}'`,
+      delimiters: ["", ""],
+      values: {
+        __BUILD_VERSION__: `'${fullVersion}'`,
+      },
     }),
     css({ output: "bundle.css" }),
+    inject({
+      process: "process",
+    }),
   ],
   external: ["custom-card-helpers", "home-assistant-js-websocket"],
   preserveEntrySignatures: false,

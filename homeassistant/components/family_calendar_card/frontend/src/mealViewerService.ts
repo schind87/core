@@ -50,7 +50,6 @@ export async function fetchMenuData() {
         Accept: "application/json, text/plain, */*",
       },
     });
-    console.log("API Response:", response.data);
 
     if (!response.data?.menuSchedules) {
       throw new Error("No menu schedules found in the response");

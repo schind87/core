@@ -128,62 +128,40 @@ export class FamilyCalendarCard extends LitElement {
     .calendar-wrapper {
       display: flex;
       flex: 1;
+      min-height: 700px;
       height: 100%;
-      overflow: hidden;
-    }
-
-    .time-and-events {
-      display: flex;
-      flex: 1;
-      overflow-y: scroll;
+      overflow-y: auto;
       overflow-x: hidden;
-      margin-top: 130px; /* Height of headers */
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-
-    .time-and-events::-webkit-scrollbar {
-      display: none;
-    }
-
-    .time-column {
-      position: sticky;
-      left: 0;
-      width: 100px;
-      background: white;
-      z-index: 3;
-      font-weight: 500;
     }
 
     .calendar-container {
       flex: 1;
-      position: relative;
+      overflow: hidden;
+      display: flex;
     }
 
     swiper-container {
       width: 100%;
-      height: 2400px;
+      height: 100%;
+      flex: 1;
     }
 
     swiper-slide {
       width: 20%;
       height: 100%;
-    }
-
-    .day-card {
-      height: 100%;
+      overflow: hidden;
       position: relative;
     }
 
-    .headers-container {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      z-index: 4;
+    .day-card {
+      height: 2400px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
     }
 
     .day-header {
-      position: absolute;
+      position: sticky;
       top: 0;
       height: 50px;
       background: white;
@@ -192,22 +170,22 @@ export class FamilyCalendarCard extends LitElement {
       font-size: 42px;
       font-weight: 500;
       color: #000000;
+      z-index: 4;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      width: 20%;
     }
 
     .all-day-section {
-      position: absolute;
+      position: sticky;
       top: 50px;
       min-height: 40px;
       background: white;
+      z-index: 3;
       padding: 4px 0;
       display: flex;
       flex-direction: column;
       gap: 4px;
-      width: 20%;
     }
 
     .meal-plan-section {
@@ -221,13 +199,24 @@ export class FamilyCalendarCard extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      border-right: 1px solid #000000;
+      border-right: 1px solid #e0e0e0;
     }
 
     .hourly-section {
       position: relative;
       flex: 1;
-      border-right: 1px solid #000000;
+      border-right: 1px solid #e0e0e0;
+    }
+
+    .time-column {
+      position: sticky;
+      left: 0;
+      width: 100px;
+      background: white;
+      z-index: 3;
+      font-weight: 500;
+      height: calc(100% - 130px);
+      margin-top: 130px;
     }
 
     .time-slot {
@@ -241,20 +230,12 @@ export class FamilyCalendarCard extends LitElement {
       margin-top: -12px; /* Center the time label */
     }
 
-    .time-tick {
-      position: absolute;
-      right: 0;
-      width: 20px;
-      height: 1px;
-      background-color: #000000;
-    }
-
     .hour-line {
       position: absolute;
       left: 0;
       right: 0;
       height: 1px;
-      background-color: #000000;
+      background-color: #e0e0e0;
     }
 
     .event {
@@ -378,7 +359,6 @@ export class FamilyCalendarCard extends LitElement {
       // Initialize menu cache service
       await menuCacheService.initializeCache();
       this._menuData = menuCacheService.getCachedMenu();
-      console.log("Menu data initialized:", this._menuData);
     } catch (error) {
       console.error("Error initializing menu data:", error);
       this._error = "Failed to load menu data";
@@ -467,6 +447,17 @@ export class FamilyCalendarCard extends LitElement {
 
       swiperEl.swiper.init();
     }
+  }
+
+  private _scrollToBusinessHours() {
+    requestAnimationFrame(() => {
+      const container = this.shadowRoot?.querySelector(".calendar-container");
+      if (container) {
+        // Scroll to 7am minus 15 minutes
+        const scrollTop = 7 * 60 - 15;
+        container.scrollTop = scrollTop;
+      }
+    });
   }
 
   private _getCalendarColor(calendarId: string): string {
@@ -642,70 +633,58 @@ export class FamilyCalendarCard extends LitElement {
           @import url("https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;800&display=swap");
         </style>
         <div class="calendar-wrapper">
-          <div class="headers-container">
-            ${days.map(
-              (day, index) => html`
-                <div class="day-header" style="left: ${100 + index * 20}%">
-                  ${day
-                    .toLocaleDateString("en-US", {
-                      weekday: "short",
-                      day: "numeric",
-                    })
-                    .replace(",", "")}
-                </div>
-                <div class="all-day-section" style="left: ${100 + index * 20}%">
-                  ${this._getAllDayEvents(day)}
-                </div>
-                <div
-                  class="meal-plan-section"
-                  style="left: ${100 + index * 20}%"
-                >
-                  ${this._getMealPlan(day)}
+          <div class="time-column">
+            ${timeSlots.map(
+              (time, i) => html`
+                <div class="time-slot" style="top: ${100 + i * 100 + 50}px">
+                  ${time}
                 </div>
               `,
             )}
           </div>
-          <div class="time-and-events">
-            <div class="time-column">
-              ${timeSlots.map(
-                (time, i) => html`
-                  <div class="time-slot" style="top: ${i * 100 + 50}px">
-                    ${time}
-                  </div>
-                  <div class="time-tick" style="top: ${i * 100}px"></div>
+          <div class="calendar-container">
+            <swiper-container
+              slides-per-view="5"
+              space-between="0"
+              initial-slide="2"
+              resistance
+              resistance-ratio="0"
+              watch-slides-progress
+            >
+              ${days.map(
+                (day) => html`
+                  <swiper-slide>
+                    <div class="day-card">
+                      <div class="day-header">
+                        ${day
+                          .toLocaleDateString("en-US", {
+                            weekday: "short",
+                            day: "numeric",
+                          })
+                          .replace(",", "")}
+                      </div>
+                      <div class="all-day-section">
+                        ${this._getAllDayEvents(day)}
+                      </div>
+                      <div class="meal-plan-section">
+                        ${this._getMealPlan(day)}
+                      </div>
+                      <div class="hourly-section">
+                        ${timeSlots.map(
+                          (_, i) => html`
+                            <div
+                              class="hour-line"
+                              style="top: ${100 + i * 100}px"
+                            ></div>
+                          `,
+                        )}
+                        ${this._getEventsForDay(day)}
+                      </div>
+                    </div>
+                  </swiper-slide>
                 `,
               )}
-            </div>
-            <div class="calendar-container">
-              <swiper-container
-                slides-per-view="5"
-                space-between="0"
-                initial-slide="2"
-                resistance
-                resistance-ratio="0"
-                watch-slides-progress
-              >
-                ${days.map(
-                  (day) => html`
-                    <swiper-slide>
-                      <div class="day-card">
-                        <div class="hourly-section">
-                          ${timeSlots.map(
-                            (_, i) => html`
-                              <div
-                                class="hour-line"
-                                style="top: ${i * 100}px"
-                              ></div>
-                            `,
-                          )}
-                          ${this._getEventsForDay(day)}
-                        </div>
-                      </div>
-                    </swiper-slide>
-                  `,
-                )}
-              </swiper-container>
-            </div>
+            </swiper-container>
           </div>
         </div>
       </ha-card>
