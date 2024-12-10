@@ -13,6 +13,8 @@ import type { SwiperContainer, SwiperSlide } from "swiper/element";
 import "swiper/css";
 import { menuCacheService } from "./menuCacheService";
 
+declare const __BUILD_VERSION__: string;
+
 register(); // Register Swiper custom elements
 
 declare global {
@@ -711,8 +713,8 @@ if (
     type: "family-calendar-card",
     name: "Family Calendar Card",
     description: "A calendar card for family scheduling",
-    version: "__BUILD_VERSION__" as string,
+    version: __BUILD_VERSION__,
   });
 }
 
-console.info(`Family Calendar Card 📆 version __BUILD_VERSION__ loaded`);
+console.info(`Family Calendar Card version ${__BUILD_VERSION__} loaded`);
