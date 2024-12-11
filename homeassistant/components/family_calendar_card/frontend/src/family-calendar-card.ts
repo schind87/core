@@ -140,6 +140,7 @@ export class FamilyCalendarCard extends LitElement {
       flex: 1;
       overflow: hidden;
       display: flex;
+      background-color: white;
     }
 
     swiper-container {
@@ -156,10 +157,11 @@ export class FamilyCalendarCard extends LitElement {
     }
 
     .day-card {
-      height: 2400px;
-      position: relative;
       display: flex;
       flex-direction: column;
+      position: relative;
+      height: 100%;
+      border-right: 1px solid #000000;
     }
 
     .day-header {
@@ -173,9 +175,6 @@ export class FamilyCalendarCard extends LitElement {
       font-weight: 500;
       color: #000000;
       z-index: 4;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
     }
 
     .all-day-section {
@@ -201,13 +200,15 @@ export class FamilyCalendarCard extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      border-right: 1px solid #e0e0e0;
+      border-right: 1px solid #000000;
+      overflow: hidden;
     }
 
     .hourly-section {
       position: relative;
       flex: 1;
-      border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
+      border-right: 1px solid #000000;
     }
 
     .time-column {
@@ -237,7 +238,7 @@ export class FamilyCalendarCard extends LitElement {
       left: 0;
       right: 0;
       height: 1px;
-      background-color: #e0e0e0;
+      background-color: #000000;
     }
 
     .event {
@@ -248,10 +249,10 @@ export class FamilyCalendarCard extends LitElement {
       border-radius: 12px;
       font-size: 32px;
       font-weight: 500;
-      color: #000000;
       overflow: hidden;
-      white-space: nowrap;
       text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #000000;
       background-color: #a4d8f9;
       display: flex;
       flex-direction: column;
@@ -261,39 +262,25 @@ export class FamilyCalendarCard extends LitElement {
     .event.meal-plan,
     .event.all-day {
       height: 32px;
-      font-size: 22px;
       padding: 4px 12px;
-      display: flex;
       align-items: center;
       margin: 0 4px;
-      border-radius: 8px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       line-height: 22px;
+    }
+
+    .event.all-day {
+      background-color: #e1e1e1;
+      font-size: 22px;
     }
 
     .event.meal-plan {
       background-color: #ffe5d9;
-      padding: 4px 8px;
       font-size: 14px;
-      min-height: 32px;
-      overflow: hidden;
-      margin: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-      width: calc(100% - 8px);
     }
 
     .event.meal-plan.error {
       background-color: #ffebee;
       color: #c62828;
-    }
-
-    .event.all-day {
-      background-color: #e1e1e1;
     }
 
     .event-icon {
@@ -370,6 +357,7 @@ export class FamilyCalendarCard extends LitElement {
   updated(changedProps: Map<string, any>) {
     if (changedProps.has("config") || changedProps.has("hass")) {
       this._initializeCard();
+      this._fetchCalendarEvents();
     }
   }
 
@@ -387,6 +375,12 @@ export class FamilyCalendarCard extends LitElement {
     const end = new Date(start);
     end.setDate(end.getDate() + 5);
 
+    console.log("Fetching events for:", {
+      entities: this.config.entities,
+      start: start.toISOString(),
+      end: end.toISOString(),
+    });
+
     try {
       const events: CalendarEvent[] = [];
       for (const entityId of this.config.entities) {
@@ -401,6 +395,8 @@ export class FamilyCalendarCard extends LitElement {
             "GET",
             `calendars/${entityId}?start=${start.toISOString()}&end=${end.toISOString()}`,
           );
+
+          console.log(`Events received for ${entityId}:`, result);
 
           const calendarEvents = result.map((event) => {
             // Handle potential undefined values
@@ -423,6 +419,7 @@ export class FamilyCalendarCard extends LitElement {
         }
       }
 
+      console.log("Final processed events:", events);
       this._events = events;
     } catch (error) {
       console.error("Error in _fetchCalendarEvents:", error);

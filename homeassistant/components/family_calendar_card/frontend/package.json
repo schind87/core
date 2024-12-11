@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node build.js && rollup -c && cp -v dist/* /workspaces/core/config/www/community/family-calendar-card/",
     "watch": "rollup -c --watch",
-    "watch:dev": "VERSION=`node -p \"require('./package.json').version\"` && TIMESTAMP=`TZ='America/New_York' date +%Y-%m-%d_%H:%M:%S` && echo Starting dev watch for version $VERSION && concurrently \"npm run watch\" \"onchange -d 1000 'dist/family-calendar-card.js' -- sh -c 'cp -vf dist/* /workspaces/core/config/www/community/family-calendar-card/ > /dev/null 2>&1 && echo New version built: $VERSION-dev.$TIMESTAMP'\""
+    "watch:dev": "echo Starting dev watch && concurrently \"npm run watch\" \"onchange -d 1000 'dist/family-calendar-card.js' -- sh -c 'TIMESTAMP=`TZ=America/New_York date +%Y-%m-%d_%H:%M:%S` && cp -vf dist/* /workspaces/core/config/www/community/family-calendar-card/ > /dev/null 2>&1 && echo New version built: 0.0.1-dev.$TIMESTAMP'\""
   },
   "author": "Your Name",
   "license": "MIT",

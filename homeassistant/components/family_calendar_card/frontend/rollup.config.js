@@ -10,10 +10,6 @@ import { readFileSync } from "fs";
 const version =
   process.env.VERSION ||
   JSON.parse(readFileSync("./package.json", "utf8")).version;
-const timestamp = execSync("TZ='America/New_York' date +%Y-%m-%d_%H:%M:%S", {
-  encoding: "utf8",
-}).trim();
-const fullVersion = `${version}-dev.${timestamp}`;
 
 export default {
   input: "src/family-calendar-card.ts",
@@ -25,7 +21,16 @@ export default {
   plugins: [
     replace({
       preventAssignment: true,
-      __BUILD_VERSION__: JSON.stringify(fullVersion),
+      __BUILD_VERSION__: () => {
+        // Generate timestamp on each build
+        const timestamp = execSync(
+          "TZ='America/New_York' date +%Y-%m-%d_%H:%M:%S",
+          {
+            encoding: "utf8",
+          },
+        ).trim();
+        return JSON.stringify(`${version}-dev.${timestamp}`);
+      },
     }),
     resolve({
       browser: true,
