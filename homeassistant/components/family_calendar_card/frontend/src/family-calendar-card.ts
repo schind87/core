@@ -13,6 +13,7 @@ import type { SwiperContainer, SwiperSlide } from "swiper/element";
 import "swiper/css";
 import { menuCacheService } from "./menuCacheService";
 import { VirtualScroller } from "./virtualScroller";
+import { styles } from "./styles";
 
 declare const __BUILD_VERSION__: string;
 
@@ -102,6 +103,8 @@ export class FamilyCalendarCard extends LitElement {
     return { mode: "open" };
   }
 
+  static styles = styles;
+
   @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ attribute: false }) public config!: any;
   @state() private _events?: CalendarEvent[];
@@ -112,255 +115,13 @@ export class FamilyCalendarCard extends LitElement {
   @state() private _scrollState: ScrollState = { left: 0, top: 0 };
   @state() private _virtualScroller?: VirtualScroller;
   @state() private _resizeObserver?: ResizeObserver;
+  @state() private days: Date[] = [];
 
   // Generate time slots in 12-hour format
   private _timeSlots = Array.from({ length: 24 }, (_, i) => {
     const hour = i % 12 || 12;
     return `${hour}:00`;
   });
-
-  static styles = css`
-    :host {
-      display: block;
-      --ha-card-background: var(--card-background-color, white);
-    }
-
-    ha-card {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      position: relative;
-      padding: 0;
-      background: var(--ha-card-background);
-      height: calc(100vh - 130px);
-      overflow: hidden;
-    }
-
-    .calendar-wrapper {
-      display: flex;
-      flex: 1;
-      height: 100%;
-      overflow: hidden;
-      background: white;
-    }
-
-    .time-column {
-      position: sticky;
-      left: 0;
-      width: 100px;
-      background: white;
-      z-index: 3;
-      font-weight: 500;
-      height: calc(100% - 130px);
-      overflow-y: scroll;
-      border-right: 1px solid rgba(0, 0, 0, 0.1);
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      &::-webkit-scrollbar {
-        display: none;
-      }
-    }
-
-    .time-slots-container {
-      position: relative;
-      height: calc(var(--hour-height, 60px) * 24);
-    }
-
-    .time-slot {
-      position: absolute;
-      left: 0;
-      width: 100px;
-      display: flex;
-      align-items: center;
-      padding-right: 10px;
-      justify-content: flex-end;
-      color: var(--secondary-text-color);
-      font-size: 0.9em;
-      transform: translateY(-50%);
-    }
-
-    .calendar-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      width: 100%;
-    }
-
-    .header-section {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: white;
-      display: flex;
-      overflow-x: hidden;
-      height: 130px;
-      width: 100%;
-    }
-
-    .scrollable-content {
-      flex: 1;
-      overflow: auto;
-      display: flex;
-      position: relative;
-      height: calc(100% - 130px);
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE and Edge */
-      &::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
-      }
-    }
-
-    swiper-container {
-      width: 100%;
-      overflow: visible;
-    }
-
-    .virtual-slide {
-      height: 100%;
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .day-card {
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      height: 100%;
-      width: 100%;
-      background: white;
-      border-right: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .day-header {
-      position: sticky;
-      top: 0;
-      height: 50px;
-      background: white;
-      text-align: left;
-      padding: 8px 16px;
-      font-size: 42px;
-      font-weight: 500;
-      color: #000000;
-      z-index: 4;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .all-day-section {
-      position: sticky;
-      top: 50px;
-      min-height: 40px;
-      background: white;
-      z-index: 3;
-      padding: 4px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .meal-plan-section {
-      position: sticky;
-      top: 90px;
-      min-height: 40px;
-      background: white;
-      z-index: 3;
-      border-bottom: 4px solid #000000;
-      padding: 4px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      border-right: 1px solid #000000;
-    }
-
-    .hourly-section {
-      position: relative;
-      flex: 1;
-      height: calc(var(--hour-height, 60px) * 24);
-      background: white;
-      width: 100%;
-    }
-
-    .event {
-      position: absolute;
-      left: 4px;
-      right: 4px;
-      padding: 12px 16px;
-      border-radius: 12px;
-      font-size: 32px;
-      font-weight: 500;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: #000000;
-      background-color: #a4d8f9;
-      display: flex;
-      flex-direction: column;
-      z-index: 1;
-    }
-
-    .event.meal-plan,
-    .event.all-day {
-      height: 32px;
-      padding: 4px 12px;
-      align-items: center;
-      margin: 0 4px;
-      line-height: 22px;
-    }
-
-    .event.all-day {
-      background-color: #e1e1e1;
-      font-size: 22px;
-    }
-
-    .event.meal-plan {
-      background-color: #ffe5d9;
-      font-size: 14px;
-    }
-
-    .event.meal-plan.error {
-      background-color: #ffebee;
-      color: #c62828;
-    }
-
-    .event-icon {
-      margin-right: 8px;
-      font-size: 20px;
-    }
-
-    .event-time {
-      font-size: 24px;
-      opacity: 0.8;
-      font-weight: 400;
-      margin-top: 4px;
-    }
-
-    .menu-item {
-      white-space: normal;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      line-height: 1.2;
-      font-size: 14px;
-      text-align: center;
-      max-height: 2.4em;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      width: 100%;
-    }
-
-    .menu-item:not(:last-child) {
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-      padding-bottom: 2px;
-    }
-
-    .virtual-slide:last-child .day-card {
-      border-right: 1px solid rgba(0, 0, 0, 0.3);
-    }
-  `;
 
   setConfig(config: CalendarCardConfig) {
     if (
@@ -384,6 +145,13 @@ export class FamilyCalendarCard extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     await this._initializeCard();
+    // Initialize days array with the next 7 days
+    const today = new Date();
+    this.days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      return date;
+    });
   }
 
   private async _initializeCard() {
@@ -616,42 +384,32 @@ export class FamilyCalendarCard extends LitElement {
     }
   }
 
-  private _renderDayColumn(index: number) {
-    const date = new Date();
-    date.setDate(date.getDate() + index);
-
+  private _renderDayColumn(index: number): TemplateResult {
     return html`
-      <div class="virtual-slide" style="height: 100%;">
-        <div class="day-card">
-          <div class="hourly-section">
-            ${this._timeSlots.map(
-              (_, i) => html`
-                <div class="hour-line" style="top: ${i * 60}px"></div>
-              `,
-            )}
-            ${this._getEventsForDay(date)}
-          </div>
-        </div>
+      <div class="day-column">
+        ${Array.from(
+          { length: 24 },
+          (_, i) => html`
+            <div
+              class="hour-line"
+              style="top: calc(${i} * var(--hour-height, 60px))"
+            ></div>
+          `,
+        )}
+        <!-- Add events or other content here -->
       </div>
     `;
   }
 
-  private _renderDayHeader(index: number) {
-    const date = new Date();
-    date.setDate(date.getDate() + index);
-
+  private _renderDayHeader(index: number): TemplateResult {
+    const date = this.days[index];
     return html`
-      <div class="virtual-slide">
-        <div class="day-header">
-          ${date
-            .toLocaleDateString("en-US", {
-              weekday: "short",
-              day: "numeric",
-            })
-            .replace(",", "")}
-        </div>
-        <div class="all-day-section">${this._getAllDayEvents(date)}</div>
-        <div class="meal-plan-section">${this._getMealPlan(date)}</div>
+      <div class="day-header">
+        ${date.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        })}
       </div>
     `;
   }
