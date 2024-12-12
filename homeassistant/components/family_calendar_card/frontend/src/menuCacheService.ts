@@ -1,14 +1,19 @@
 import { fetchMenuData } from "./mealViewerService";
 
+interface MenuData {
+  date: string;
+  items: string[];
+}
+
 interface MenuCache {
-  data: any | null; // We'll type this properly once we have the menu data structure
+  data: Map<string, MenuData>;
   lastUpdated: Date | null;
 }
 
 class MenuCacheService {
   private static instance: MenuCacheService;
   private cache: MenuCache = {
-    data: null,
+    data: new Map(),
     lastUpdated: null,
   };
   private initialized = false;
@@ -42,8 +47,15 @@ class MenuCacheService {
     try {
       console.log("Refreshing menu cache...");
       const data = await fetchMenuData();
+      // Convert the data into a Map keyed by date
+      const menuMap = new Map<string, MenuData>();
+      if (data && Array.isArray(data)) {
+        data.forEach((menu) => {
+          menuMap.set(menu.date, menu);
+        });
+      }
       this.cache = {
-        data,
+        data: menuMap,
         lastUpdated: new Date(),
       };
     } catch (error) {
@@ -52,8 +64,11 @@ class MenuCacheService {
     }
   }
 
-  public getCachedMenu() {
-    return this.cache.data;
+  public getCachedMenu(date?: string) {
+    if (!date) {
+      return Array.from(this.cache.data.values());
+    }
+    return this.cache.data.get(date);
   }
 
   public getLastUpdated() {
@@ -62,6 +77,10 @@ class MenuCacheService {
 
   public isInitialized() {
     return this.initialized;
+  }
+
+  public hasMenuForDate(date: string): boolean {
+    return this.cache.data.has(date);
   }
 }
 

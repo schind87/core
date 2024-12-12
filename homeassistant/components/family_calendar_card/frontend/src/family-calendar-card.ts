@@ -12,6 +12,7 @@ import { register } from "swiper/element";
 import type { SwiperContainer, SwiperSlide } from "swiper/element";
 import "swiper/css";
 import { menuCacheService } from "./menuCacheService";
+import { VirtualScroller } from "./virtualScroller";
 
 declare const __BUILD_VERSION__: string;
 
@@ -40,13 +41,12 @@ interface CalendarCardConfig {
   title?: string;
 }
 
-interface GoogleCalendarEvent {
+interface GoogleCalendarApiResponse {
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
   summary: string;
   location?: string;
   colorId?: string;
-  // Add other properties as needed
 }
 
 interface GoogleCalendarColors {
@@ -64,6 +64,11 @@ interface GoogleCalendarColors {
       foreground: string;
     };
   };
+}
+
+interface ScrollState {
+  left: number;
+  top: number;
 }
 
 class DateUtils {
@@ -104,6 +109,9 @@ export class FamilyCalendarCard extends LitElement {
   @state() private _error?: string;
   @state() private _colors?: GoogleCalendarColors;
   @state() private _menuData: any = null;
+  @state() private _scrollState: ScrollState = { left: 0, top: 0 };
+  @state() private _virtualScroller?: VirtualScroller;
+  @state() private _resizeObserver?: ResizeObserver;
 
   // Generate time slots in 12-hour format
   private _timeSlots = Array.from({ length: 24 }, (_, i) => {
@@ -114,46 +122,105 @@ export class FamilyCalendarCard extends LitElement {
   static styles = css`
     :host {
       display: block;
-      height: 100%;
-      font-family: "EB Garamond", serif;
-      font-optical-sizing: auto;
-      overflow: hidden;
+      --ha-card-background: var(--card-background-color, white);
     }
 
     ha-card {
-      height: 100%;
       display: flex;
       flex-direction: column;
+      flex: 1;
+      position: relative;
+      padding: 0;
+      background: var(--ha-card-background);
+      height: calc(100vh - 130px);
       overflow: hidden;
     }
 
     .calendar-wrapper {
       display: flex;
       flex: 1;
-      min-height: 700px;
       height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: hidden;
+      background: white;
+    }
+
+    .time-column {
+      position: sticky;
+      left: 0;
+      width: 100px;
+      background: white;
+      z-index: 3;
+      font-weight: 500;
+      height: calc(100% - 130px);
+      overflow-y: scroll;
+      border-right: 1px solid rgba(0, 0, 0, 0.1);
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    .time-slots-container {
+      position: relative;
+      height: calc(var(--hour-height, 60px) * 24);
+    }
+
+    .time-slot {
+      position: absolute;
+      left: 0;
+      width: 100px;
+      display: flex;
+      align-items: center;
+      padding-right: 10px;
+      justify-content: flex-end;
+      color: var(--secondary-text-color);
+      font-size: 0.9em;
+      transform: translateY(-50%);
     }
 
     .calendar-container {
       flex: 1;
-      overflow: hidden;
       display: flex;
-      background-color: white;
+      flex-direction: column;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .header-section {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: white;
+      display: flex;
+      overflow-x: hidden;
+      height: 130px;
+      width: 100%;
+    }
+
+    .scrollable-content {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      position: relative;
+      height: calc(100% - 130px);
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE and Edge */
+      &::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+      }
     }
 
     swiper-container {
       width: 100%;
-      height: 100%;
-      flex: 1;
+      overflow: visible;
     }
 
-    swiper-slide {
-      width: 20%;
+    .virtual-slide {
       height: 100%;
-      overflow: hidden;
-      position: relative;
+      position: absolute;
+      display: flex;
+      flex-direction: column;
     }
 
     .day-card {
@@ -161,7 +228,9 @@ export class FamilyCalendarCard extends LitElement {
       flex-direction: column;
       position: relative;
       height: 100%;
-      border-right: 1px solid #000000;
+      width: 100%;
+      background: white;
+      border-right: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .day-header {
@@ -175,6 +244,10 @@ export class FamilyCalendarCard extends LitElement {
       font-weight: 500;
       color: #000000;
       z-index: 4;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .all-day-section {
@@ -187,6 +260,7 @@ export class FamilyCalendarCard extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .meal-plan-section {
@@ -201,44 +275,14 @@ export class FamilyCalendarCard extends LitElement {
       flex-direction: column;
       gap: 4px;
       border-right: 1px solid #000000;
-      overflow: hidden;
     }
 
     .hourly-section {
       position: relative;
       flex: 1;
-      overflow-y: auto;
-      border-right: 1px solid #000000;
-    }
-
-    .time-column {
-      position: sticky;
-      left: 0;
-      width: 100px;
+      height: calc(var(--hour-height, 60px) * 24);
       background: white;
-      z-index: 3;
-      font-weight: 500;
-      height: calc(100% - 130px);
-      margin-top: 130px;
-    }
-
-    .time-slot {
-      position: absolute;
-      padding: 0 8px;
-      font-size: 24px;
-      color: #000000;
-      white-space: nowrap;
-      height: 24px;
-      line-height: 24px;
-      margin-top: -12px; /* Center the time label */
-    }
-
-    .hour-line {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background-color: #000000;
+      width: 100%;
     }
 
     .event {
@@ -312,6 +356,10 @@ export class FamilyCalendarCard extends LitElement {
       border-bottom: 1px solid rgba(0, 0, 0, 0.1);
       padding-bottom: 2px;
     }
+
+    .virtual-slide:last-child .day-card {
+      border-right: 1px solid rgba(0, 0, 0, 0.3);
+    }
   `;
 
   setConfig(config: CalendarCardConfig) {
@@ -347,10 +395,35 @@ export class FamilyCalendarCard extends LitElement {
     try {
       // Initialize menu cache service
       await menuCacheService.initializeCache();
-      this._menuData = menuCacheService.getCachedMenu();
+
+      // Fetch initial calendar events
+      await this._fetchCalendarEvents();
+
+      // Prefetch initial visible range
+      const container = this.shadowRoot?.querySelector(
+        ".scrollable-content",
+      ) as HTMLElement;
+      if (container) {
+        const { clientWidth } = container;
+        const itemWidth = 305; // Default width before virtual scroller is initialized
+
+        // Calculate initial visible range
+        const startIndex = 0;
+        const endIndex = Math.ceil(clientWidth / itemWidth) + 2;
+
+        this._prefetchMenuData(startIndex, endIndex);
+      }
+
+      // Set up periodic refresh for calendar events
+      setInterval(
+        () => {
+          this._fetchCalendarEvents();
+        },
+        5 * 60 * 1000,
+      ); // Refresh every 5 minutes
     } catch (error) {
-      console.error("Error initializing menu data:", error);
-      this._error = "Failed to load menu data";
+      console.error("Error initializing card data:", error);
+      this._error = "Failed to load data";
     }
   }
 
@@ -363,23 +436,13 @@ export class FamilyCalendarCard extends LitElement {
 
   private async _fetchCalendarEvents() {
     if (!this.config?.entities || !this.hass) {
-      console.log("Config or hass not ready:", {
-        config: this.config,
-        hass: !!this.hass,
-      });
       return;
     }
 
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date(start);
-    end.setDate(end.getDate() + 5);
-
-    console.log("Fetching events for:", {
-      entities: this.config.entities,
-      start: start.toISOString(),
-      end: end.toISOString(),
-    });
+    end.setDate(end.getDate() + 30); // Fetch a month of events
 
     try {
       const events: CalendarEvent[] = [];
@@ -390,62 +453,207 @@ export class FamilyCalendarCard extends LitElement {
           continue;
         }
 
-        try {
-          const result: GoogleCalendarEvent[] = await this.hass.callApi(
-            "GET",
-            `calendars/${entityId}?start=${start.toISOString()}&end=${end.toISOString()}`,
-          );
+        const response = await this.hass.callApi(
+          "GET",
+          `calendars/${entityId}?start=${start.toISOString()}&end=${end.toISOString()}`,
+        );
 
-          console.log(`Events received for ${entityId}:`, result);
-
-          const calendarEvents = result.map((event) => {
-            // Handle potential undefined values
-            const startDateTime =
-              event.start.dateTime || event.start.date || "";
-            const endDateTime = event.end.dateTime || event.end.date || "";
-
-            return {
-              start: new Date(startDateTime),
-              end: new Date(endDateTime),
+        // Type guard to ensure response is an array of calendar events
+        if (
+          Array.isArray(response) &&
+          response.every(
+            (item) =>
+              item &&
+              typeof item === "object" &&
+              "start" in item &&
+              "end" in item &&
+              "summary" in item,
+          )
+        ) {
+          const calendarEvents = (response as GoogleCalendarApiResponse[]).map(
+            (event) => ({
+              start: new Date(event.start.dateTime || event.start.date || ""),
+              end: new Date(event.end.dateTime || event.end.date || ""),
               title: event.summary,
               calendar: entityId,
               location: event.location,
               color: event.colorId,
-            };
-          });
+            }),
+          );
           events.push(...calendarEvents);
-        } catch (error) {
-          console.error(`Error fetching events for ${entityId}:`, error);
         }
       }
 
-      console.log("Final processed events:", events);
       this._events = events;
     } catch (error) {
-      console.error("Error in _fetchCalendarEvents:", error);
+      console.error("Error fetching calendar events:", error);
       this._error = "Failed to load calendar events";
     }
   }
 
   firstUpdated() {
-    const container = this.shadowRoot?.querySelector(".calendar-container");
+    // Wait for container to be ready
+    const container = this.shadowRoot?.querySelector(".scrollable-content");
     if (container) {
-      container.scrollTop = 1000; // Scroll to 10am
-    }
+      this._resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const availableHeight = entry.contentRect.height;
+          console.log("Available height from observer:", availableHeight);
 
-    // Initialize Swiper with proper typing
-    const swiperEl = this.shadowRoot?.querySelector(
-      "swiper-container",
-    ) as SwiperContainer;
-    if (swiperEl) {
-      // Set any additional Swiper parameters
-      Object.assign(swiperEl, {
-        centeredSlides: true,
-        centerInsufficientSlides: true,
+          if (availableHeight > 0) {
+            // Calculate hour height to show 12 hours
+            const hourHeight = Math.floor(availableHeight / 12);
+            console.log("Hour height:", hourHeight);
+
+            // Set the CSS custom property
+            this.style.setProperty("--hour-height", `${hourHeight}px`);
+
+            // Initialize other components now that we have the correct height
+            this._initializeVirtualScroller();
+
+            // Can disconnect observer after initial setup
+            this._resizeObserver?.disconnect();
+          }
+        }
       });
 
-      swiperEl.swiper.init();
+      this._resizeObserver.observe(container);
     }
+
+    // Add scroll event listeners
+    const timeColumn = this.shadowRoot?.querySelector(".time-column");
+    const scrollableContent = this.shadowRoot?.querySelector(
+      ".scrollable-content",
+    );
+
+    timeColumn?.addEventListener("scroll", this._syncScroll.bind(this));
+    scrollableContent?.addEventListener("scroll", this._syncScroll.bind(this));
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+
+    // Clean up resize observer
+    this._resizeObserver?.disconnect();
+
+    // Remove scroll event listeners
+    const timeColumn = this.shadowRoot?.querySelector(".time-column");
+    const scrollableContent = this.shadowRoot?.querySelector(
+      ".scrollable-content",
+    );
+
+    timeColumn?.removeEventListener("scroll", this._syncScroll.bind(this));
+    scrollableContent?.removeEventListener(
+      "scroll",
+      this._syncScroll.bind(this),
+    );
+  }
+
+  private async _initializeVirtualScroller() {
+    const container = this.shadowRoot?.querySelector(
+      ".scrollable-content",
+    ) as HTMLElement;
+    const headerContainer = this.shadowRoot?.querySelector(
+      ".header-section",
+    ) as HTMLElement;
+    const scrollableContent = this.shadowRoot?.querySelector(
+      ".scrollable-content",
+    ) as HTMLElement;
+
+    if (!container || !headerContainer || !scrollableContent) return;
+
+    // Wait for next frame to ensure containers are sized
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const availableWidth = scrollableContent.clientWidth;
+    const columnWidth = Math.floor(availableWidth / 5); // Use Math.floor to avoid decimal widths
+
+    console.log("Initializing scroller:", {
+      availableWidth,
+      columnWidth,
+      scrollableContentWidth: scrollableContent.clientWidth,
+      scrollableContentOffsetWidth: scrollableContent.offsetWidth,
+      headerWidth: headerContainer.clientWidth,
+      headerOffsetWidth: headerContainer.offsetWidth,
+    });
+
+    this._virtualScroller = new VirtualScroller({
+      container,
+      headerContainer,
+      itemWidth: columnWidth,
+      overscan: 2,
+      renderItem: (index: number) => this._renderDayColumn(index),
+      renderHeader: (index: number) => this._renderDayHeader(index),
+      onScroll: (state: { left: number; top: number }) => {
+        this._scrollState = state;
+        this._syncScroll(state);
+      },
+    });
+  }
+
+  private _syncScroll(eventOrState: Event | { left: number; top: number }) {
+    const timeColumn = this.shadowRoot?.querySelector(
+      ".time-column",
+    ) as HTMLElement;
+    const scrollableContent = this.shadowRoot?.querySelector(
+      ".scrollable-content",
+    ) as HTMLElement;
+
+    if (!timeColumn || !scrollableContent) return;
+
+    // Handle virtual scroller state
+    if ("top" in eventOrState) {
+      timeColumn.scrollTop = eventOrState.top;
+      return;
+    }
+
+    // Handle direct scroll events
+    const target = eventOrState.target as HTMLElement;
+    if (target === timeColumn) {
+      scrollableContent.scrollTop = target.scrollTop;
+    } else if (target === scrollableContent) {
+      timeColumn.scrollTop = target.scrollTop;
+    }
+  }
+
+  private _renderDayColumn(index: number) {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+
+    return html`
+      <div class="virtual-slide" style="height: 100%;">
+        <div class="day-card">
+          <div class="hourly-section">
+            ${this._timeSlots.map(
+              (_, i) => html`
+                <div class="hour-line" style="top: ${i * 60}px"></div>
+              `,
+            )}
+            ${this._getEventsForDay(date)}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderDayHeader(index: number) {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+
+    return html`
+      <div class="virtual-slide">
+        <div class="day-header">
+          ${date
+            .toLocaleDateString("en-US", {
+              weekday: "short",
+              day: "numeric",
+            })
+            .replace(",", "")}
+        </div>
+        <div class="all-day-section">${this._getAllDayEvents(date)}</div>
+        <div class="meal-plan-section">${this._getMealPlan(date)}</div>
+      </div>
+    `;
   }
 
   private _scrollToBusinessHours() {
@@ -613,77 +821,96 @@ export class FamilyCalendarCard extends LitElement {
     `;
   }
 
+  private _getDateForIndex(index: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+    return date.toISOString().split("T")[0];
+  }
+
+  protected _prefetchMenuData(startIndex: number, endIndex: number) {
+    // Prefetch an additional week ahead
+    const prefetchEndIndex = endIndex + 7;
+
+    for (let i = startIndex; i <= prefetchEndIndex; i++) {
+      const date = this._getDateForIndex(i);
+      if (date) {
+        menuCacheService.getCachedMenu(date);
+      }
+    }
+  }
+
+  protected override update(changedProps: Map<string, unknown>) {
+    super.update(changedProps);
+
+    if (this._virtualScroller) {
+      const container = this.shadowRoot?.querySelector(
+        ".scrollable-content",
+      ) as HTMLElement;
+      if (container) {
+        const { scrollLeft, clientWidth } = container;
+        const itemWidth = this._virtualScroller.getItemWidth();
+
+        const startIndex = Math.max(0, Math.floor(scrollLeft / itemWidth) - 2);
+        const endIndex = Math.min(
+          1000, // Fixed number of items
+          Math.ceil((scrollLeft + clientWidth) / itemWidth) + 2,
+        );
+
+        this._prefetchMenuData(startIndex, endIndex);
+      }
+    }
+  }
+
+  private _renderTimeColumn() {
+    const hours: TemplateResult[] = [];
+
+    // Hours 0-23 (starting with midnight)
+    for (let i = 0; i < 24; i++) {
+      const hour =
+        i === 0
+          ? "12:00"
+          : i < 12
+          ? `${i}:00`
+          : i === 12
+          ? "12:00"
+          : `${i - 12}:00`;
+      const ampm = i < 12 ? "am" : "pm";
+
+      hours.push(html`
+        <div
+          class="time-slot"
+          style="top: calc(${i} * var(--hour-height, 60px))"
+        >
+          ${hour}${ampm}
+        </div>
+      `);
+    }
+
+    return html`
+      <div class="time-column">
+        <div class="time-slots-container">${hours}</div>
+      </div>
+    `;
+  }
+
   render() {
     if (!this.config || !this.hass) {
       return html``;
     }
 
-    const timeSlots = Array.from({ length: 23 }, (_, i) => {
-      const hour = (i + 1) % 12 || 12;
-      const meridiem = i < 11 ? "am" : "pm";
-      return `${hour} ${meridiem}`;
-    });
-
-    const days = this._getDays();
-
     return html`
       <ha-card>
-        <style>
-          @import url("https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;800&display=swap");
-        </style>
         <div class="calendar-wrapper">
           <div class="time-column">
-            ${timeSlots.map(
+            ${this._timeSlots.map(
               (time, i) => html`
-                <div class="time-slot" style="top: ${100 + i * 100 + 50}px">
-                  ${time}
-                </div>
+                <div class="time-slot" style="top: ${i * 60}px">${time}</div>
               `,
             )}
           </div>
           <div class="calendar-container">
-            <swiper-container
-              slides-per-view="5"
-              space-between="0"
-              initial-slide="2"
-              resistance
-              resistance-ratio="0"
-              watch-slides-progress
-            >
-              ${days.map(
-                (day) => html`
-                  <swiper-slide>
-                    <div class="day-card">
-                      <div class="day-header">
-                        ${day
-                          .toLocaleDateString("en-US", {
-                            weekday: "short",
-                            day: "numeric",
-                          })
-                          .replace(",", "")}
-                      </div>
-                      <div class="all-day-section">
-                        ${this._getAllDayEvents(day)}
-                      </div>
-                      <div class="meal-plan-section">
-                        ${this._getMealPlan(day)}
-                      </div>
-                      <div class="hourly-section">
-                        ${timeSlots.map(
-                          (_, i) => html`
-                            <div
-                              class="hour-line"
-                              style="top: ${100 + i * 100}px"
-                            ></div>
-                          `,
-                        )}
-                        ${this._getEventsForDay(day)}
-                      </div>
-                    </div>
-                  </swiper-slide>
-                `,
-              )}
-            </swiper-container>
+            <div class="header-section"></div>
+            <div class="scrollable-content"></div>
           </div>
         </div>
       </ha-card>
