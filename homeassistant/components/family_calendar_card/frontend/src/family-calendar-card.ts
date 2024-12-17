@@ -192,21 +192,41 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
 
     /* Time grid styling */
     .fc .fc-timegrid-slot {
-      height: 4.5em !important;
+      height: 6em;
       border-bottom: 1px solid var(--fc-border-color) !important;
     }
 
-    /* Add vertical lines between days */
     .fc .fc-timegrid-col {
       border-right: 1px solid var(--fc-border-color) !important;
     }
 
-    /* Remove borders from time axis and add more space */
+    /* Remove borders only from time axis */
     .fc .fc-timegrid-axis {
       border: none !important;
     }
 
     .fc .fc-timegrid-axis-frame {
+      border: none !important;
+    }
+
+    /* Hide all-day text */
+    .fc-timegrid-axis-cushion.fc-scrollgrid-shrink-cushion {
+      display: none !important;
+    }
+
+    /* Remove borders only from time axis cells */
+    .fc .fc-timegrid-axis-chunk > table,
+    .fc .fc-timegrid-axis-chunk > table td,
+    .fc .fc-timegrid-axis td {
+      border: none !important;
+    }
+
+    /* Keep borders for day columns but remove from axis */
+    .fc .fc-timegrid-slots td.fc-timegrid-slot {
+      border-bottom: 1px solid var(--fc-border-color) !important;
+    }
+
+    .fc .fc-timegrid-slots td.fc-timegrid-axis {
       border: none !important;
     }
 
@@ -216,26 +236,32 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       font-size: 1.5em;
       font-weight: 400;
       padding-right: 8px;
-      transform: translateY(-85%);
-      line-height: 1.5;
+      transform: translateY(-100%);
       text-transform: lowercase;
     }
 
-    /* Remove hour lines in time label column */
-    .fc .fc-timegrid-slot-label {
+    /* Remove horizontal lines between time slots in the axis */
+    .fc .fc-timegrid-axis-chunk {
       border-bottom: none !important;
-      vertical-align: top;
     }
 
-    .fc .fc-timegrid-slot.fc-timegrid-slot-label {
+    .fc .fc-timegrid-slots tr {
       border-bottom: none !important;
     }
 
     /* Event styling */
     .fc-timegrid-event {
-      border-radius: 16px !important;
+      border-radius: 12px !important;
       border: none !important;
       padding: 6px 8px !important;
+      margin: 1px 0 !important;
+      line-height: 1.3 !important;
+    }
+
+    /* Make events fill the column width */
+    .fc .fc-timegrid-col-events {
+      margin: 0 !important;
+      padding: 0 1px !important;
     }
 
     .fc-timegrid-event .fc-event-main {
@@ -246,7 +272,7 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       font-weight: 600;
       font-size: 2em;
       color: black;
-      margin-bottom: 8px;
+      margin-bottom: 2px;
     }
 
     .fc-timegrid-event .fc-event-time {
@@ -314,61 +340,6 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     .fc-scroller::-webkit-scrollbar-thumb:hover {
       background: rgba(0, 0, 0, 0.2);
     }
-
-    /* Handle overlapping events */
-    .fc .fc-timegrid-col-events {
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    /* Base event styling */
-    .fc-timegrid-event {
-      border-radius: 16px !important;
-      border: none !important;
-      padding: 6px 8px !important;
-      margin: 0 !important;
-    }
-
-    /* Make overlapping events take half width */
-    .fc-v-event.fc-event-mirror,
-    .fc-v-event {
-      margin: 0 !important;
-      border-radius: 16px !important;
-    }
-
-    /* Overlapping events */
-    .fc-timegrid-event-harness-inset.fc-timegrid-event-harness-overlap {
-      width: calc(50% - 4px) !important;
-    }
-
-    /* Second overlapping event */
-    .fc-timegrid-event-harness-inset.fc-timegrid-event-harness-overlap
-      + .fc-timegrid-event-harness-inset.fc-timegrid-event-harness-overlap {
-      margin-left: calc(50% + 4px) !important;
-    }
-
-    /* Non-overlapping events */
-    .fc-timegrid-event-harness:not(.fc-timegrid-event-harness-overlap) {
-      width: 100% !important;
-    }
-
-    /* Event content spacing */
-    .fc-timegrid-event .fc-event-main {
-      padding: 2px;
-    }
-
-    .fc-timegrid-event .fc-event-title {
-      font-weight: 600;
-      font-size: 2em;
-      color: black;
-      margin-bottom: 8px;
-    }
-
-    .fc-timegrid-event .fc-event-time {
-      font-size: 2em;
-      color: rgba(0, 0, 0, 0.7);
-      font-weight: 400;
-    }
   `;
 
   setConfig(config: CalendarCardConfig) {
@@ -433,17 +404,17 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
         interactionPlugin,
         scrollGridPlugin,
       ],
-      initialView: "timeGridFourDay",
+      initialView: "timeGridFiveDay",
       headerToolbar: {
         left: "prev,next today",
         center: "title",
         right: "",
       },
       views: {
-        timeGridFourDay: {
+        timeGridFiveDay: {
           type: "timeGrid",
-          duration: { days: 4 },
-          buttonText: "4 Day",
+          duration: { days: 5 },
+          buttonText: "5 Day",
           dayHeaderFormat: { weekday: "short", day: "numeric" },
           allDaySlot: true,
           allDayText: "All Day",
