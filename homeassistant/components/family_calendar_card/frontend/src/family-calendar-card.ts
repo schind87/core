@@ -3,15 +3,58 @@
  * Description: Main entry point for the Family Calendar custom card
  *
  */
-import { styles } from "./styles";
-import { html, css, LitElement, nothing } from "lit";
-import type { TemplateResult } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import { HomeAssistant } from "custom-card-helpers";
+import { LitElement, html, css } from "lit";
+import { property, state, query } from "lit/decorators.js";
+import {
+  HomeAssistant,
+  LovelaceCard,
+  LovelaceCardEditor,
+} from "custom-card-helpers";
+import {
+  Calendar,
+  EventSourceInput,
+  CalendarOptions,
+  EventInput,
+} from "@fullcalendar/core";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import scrollGridPlugin from "@fullcalendar/scrollgrid";
 import { menuCacheService } from "./menuCacheService";
 
-declare const __BUILD_VERSION__: string;
+// This is for editor support
+declare global {
+  interface Window {
+    customCards: Array<{
+      type: string;
+      name: string;
+      description: string;
+      preview: boolean;
+    }>;
+  }
+  interface HTMLElementTagNameMap {
+    "family-calendar-card-editor": LovelaceCardEditor;
+    "hui-error-card": LovelaceCard;
+  }
+}
 
+// Card version should be shown in the console
+console.info(
+  "%c FAMILY-CALENDAR-CARD %c Version 1.0.0 ",
+  "color: orange; font-weight: bold; background: black",
+  "color: white; font-weight: bold; background: dimgray",
+);
+
+// Register the card with Home Assistant
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "family-calendar-card",
+  name: "Family Calendar Card",
+  description: "A calendar card for family scheduling",
+  preview: true,
+});
+
+// Define interfaces
 interface CalendarEvent {
   start: Date;
   end: Date;
@@ -22,83 +65,311 @@ interface CalendarEvent {
   color?: string;
 }
 
+interface ColorFilter {
+  pattern: string;
+  color: string;
+}
+
 interface CalendarCardConfig {
+  type: string;
   entities: string[];
   show_header?: boolean;
   title?: string;
+  color_filters?: ColorFilter[];
 }
 
-interface GoogleCalendarEvent {
+interface HACalendarEvent {
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
   summary: string;
   location?: string;
+  description?: string;
   colorId?: string;
-  // Add other properties as needed
 }
 
-interface GoogleCalendarColors {
-  kind: string;
-  updated: string;
-  calendar: {
-    [key: string]: {
-      background: string;
-      foreground: string;
+interface MenuData {
+  date: string;
+  items: string[];
+}
+
+// Define the custom element
+class FamilyCalendarCard extends LitElement implements LovelaceCard {
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement("family-calendar-card-editor");
+  }
+
+  public static getStubConfig(): Record<string, unknown> {
+    return {
+      entities: ["calendar.test_name"],
+      show_header: true,
+      title: "Family Calendar",
+      color_filters: [
+        { pattern: "calli", color: "Plum" },
+        { pattern: "jess", color: "PaleGreen" },
+        { pattern: "david", color: "LightSkyBlue" },
+        { pattern: "cambria", color: "LightPink" },
+      ],
     };
-  };
-  event: {
-    [key: string]: {
-      background: string;
-      foreground: string;
-    };
-  };
-}
-
-class DateUtils {
-  static getHourRange(startHour: number, endHour: number): number[] {
-    const hours: number[] = [];
-    for (let hour = startHour; hour <= endHour; hour++) {
-      hours.push(hour);
-    }
-    return hours;
   }
 
-  static getTimeString(date: Date): string {
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+  // Required by LovelaceCard interface
+  public async getCardSize(): Promise<number> {
+    return 12; // Calendar takes up significant space
   }
-
-  static convertTimeToPixels(date: Date, startHour: number): number {
-    const hours = date.getHours() - startHour;
-    const minutes = date.getMinutes();
-    return (hours * 60 + minutes) * (60 / 60); // 60px per hour
-  }
-}
-
-// Define the class first
-@customElement("family-calendar-card")
-export class FamilyCalendarCard extends LitElement {
-  static get shadowRootOptions(): { mode: "open" | "closed" } {
-    return { mode: "open" };
-  }
-
-  static styles = styles;
 
   @property({ attribute: false }) public hass!: HomeAssistant;
-  @property({ attribute: false }) public config!: any;
+  @property({ attribute: false }) public config!: CalendarCardConfig;
   @state() private _events?: CalendarEvent[];
   @state() private _error?: string;
-  @state() private _colors?: GoogleCalendarColors;
-  @state() private _menuData: any = null;
+  @state() private _menuData: MenuData[] | null = null;
+  @query("#calendar") private calendarEl!: HTMLElement;
+  private calendar?: Calendar;
 
-  // Generate time slots in 12-hour format
-  private _timeSlots = Array.from({ length: 24 }, (_, i) => {
-    const hour = i % 12 || 12;
-    return `${hour}:00`;
-  });
+  static styles = css`
+    :host {
+      display: block;
+      height: 100%;
+      --fc-border-color: var(--divider-color, rgba(255, 255, 255, 0.06));
+      --fc-page-bg-color: var(--card-background-color, #fff);
+      --fc-neutral-bg-color: var(--card-background-color, #fff);
+      --fc-event-text-color: black;
+      --fc-list-event-hover-bg-color: rgba(0, 0, 0, 0.06);
+      --fc-small-font-size: 0.85em;
+      --fc-neutral-text-color: black;
+      --fc-button-text-color: black;
+      --fc-button-active-bg-color: var(--primary-color);
+      --fc-button-active-text-color: white;
+    }
+
+    ha-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 16px;
+      box-sizing: border-box;
+      background: var(--ha-card-background, var(--card-background-color, #fff));
+    }
+
+    #calendar {
+      height: 100%;
+      width: 100%;
+    }
+
+    .fc {
+      height: 100%;
+      color: var(--primary-text-color);
+    }
+
+    /* Remove most borders */
+    .fc th,
+    .fc td {
+      border: none !important;
+    }
+
+    .fc-theme-standard .fc-scrollgrid {
+      border: none !important;
+    }
+
+    /* Header styling */
+    .fc .fc-toolbar-title {
+      font-size: 1.4em;
+      font-weight: 600;
+      color: black;
+    }
+
+    .fc .fc-col-header-cell {
+      padding: 8px 4px;
+      background: transparent;
+      border-right: 1px solid var(--fc-border-color) !important;
+    }
+
+    .fc .fc-col-header-cell-cushion {
+      padding: 4px;
+      color: black;
+      font-weight: 600;
+      font-size: 3em;
+    }
+
+    /* Time grid styling */
+    .fc .fc-timegrid-slot {
+      height: 4.5em !important;
+      border-bottom: 1px solid var(--fc-border-color) !important;
+    }
+
+    /* Add vertical lines between days */
+    .fc .fc-timegrid-col {
+      border-right: 1px solid var(--fc-border-color) !important;
+    }
+
+    /* Remove borders from time axis and add more space */
+    .fc .fc-timegrid-axis {
+      border: none !important;
+    }
+
+    .fc .fc-timegrid-axis-frame {
+      border: none !important;
+    }
+
+    .fc .fc-timegrid-axis-cushion,
+    .fc .fc-timegrid-slot-label-cushion {
+      color: black;
+      font-size: 1.5em;
+      font-weight: 400;
+      padding-right: 8px;
+      transform: translateY(-85%);
+      line-height: 1.5;
+      text-transform: lowercase;
+    }
+
+    /* Remove hour lines in time label column */
+    .fc .fc-timegrid-slot-label {
+      border-bottom: none !important;
+      vertical-align: top;
+    }
+
+    .fc .fc-timegrid-slot.fc-timegrid-slot-label {
+      border-bottom: none !important;
+    }
+
+    /* Event styling */
+    .fc-timegrid-event {
+      border-radius: 16px !important;
+      border: none !important;
+      padding: 6px 8px !important;
+    }
+
+    .fc-timegrid-event .fc-event-main {
+      padding: 2px;
+    }
+
+    .fc-timegrid-event .fc-event-title {
+      font-weight: 600;
+      font-size: 2em;
+      color: black;
+      margin-bottom: 8px;
+    }
+
+    .fc-timegrid-event .fc-event-time {
+      font-size: 2em;
+      color: rgba(0, 0, 0, 0.7);
+      font-weight: 400;
+    }
+
+    /* Current time indicator */
+    .fc .fc-timegrid-now-indicator-line {
+      border-color: #ff5252;
+      border-width: 2px;
+    }
+
+    .fc .fc-timegrid-now-indicator-arrow {
+      border-color: #ff5252;
+      border-width: 5px;
+    }
+
+    /* Today column highlight */
+    .fc .fc-day-today {
+      background: transparent !important;
+    }
+
+    .fc .fc-day-today .fc-col-header-cell-cushion {
+      color: var(--primary-color);
+      font-weight: 700;
+    }
+
+    /* Toolbar buttons */
+    .fc .fc-button {
+      background: transparent;
+      border: none;
+      color: black;
+      text-transform: uppercase;
+      font-weight: 600;
+      font-size: 0.9em;
+      padding: 6px 12px;
+    }
+
+    .fc .fc-button:hover {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .fc .fc-button-active {
+      background: var(--primary-color) !important;
+      color: white !important;
+    }
+
+    /* Scrollbar styling */
+    .fc-scroller::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .fc-scroller::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .fc-scroller::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+    }
+
+    .fc-scroller::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    /* Handle overlapping events */
+    .fc .fc-timegrid-col-events {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Base event styling */
+    .fc-timegrid-event {
+      border-radius: 16px !important;
+      border: none !important;
+      padding: 6px 8px !important;
+      margin: 0 !important;
+    }
+
+    /* Make overlapping events take half width */
+    .fc-v-event.fc-event-mirror,
+    .fc-v-event {
+      margin: 0 !important;
+      border-radius: 16px !important;
+    }
+
+    /* Overlapping events */
+    .fc-timegrid-event-harness-inset.fc-timegrid-event-harness-overlap {
+      width: calc(50% - 4px) !important;
+    }
+
+    /* Second overlapping event */
+    .fc-timegrid-event-harness-inset.fc-timegrid-event-harness-overlap
+      + .fc-timegrid-event-harness-inset.fc-timegrid-event-harness-overlap {
+      margin-left: calc(50% + 4px) !important;
+    }
+
+    /* Non-overlapping events */
+    .fc-timegrid-event-harness:not(.fc-timegrid-event-harness-overlap) {
+      width: 100% !important;
+    }
+
+    /* Event content spacing */
+    .fc-timegrid-event .fc-event-main {
+      padding: 2px;
+    }
+
+    .fc-timegrid-event .fc-event-title {
+      font-weight: 600;
+      font-size: 2em;
+      color: black;
+      margin-bottom: 8px;
+    }
+
+    .fc-timegrid-event .fc-event-time {
+      font-size: 2em;
+      color: rgba(0, 0, 0, 0.7);
+      font-weight: 400;
+    }
+  `;
 
   setConfig(config: CalendarCardConfig) {
     if (
@@ -116,14 +387,12 @@ export class FamilyCalendarCard extends LitElement {
     });
 
     this.config = config;
-    this._fetchCalendarEvents();
   }
 
   async connectedCallback() {
     super.connectedCallback();
+    console.log("Connected callback called");
     await this._initializeCard();
-    window.addEventListener("resize", () => this.updateDebugInfo());
-    this._setupResizeObserver();
   }
 
   private async _initializeCard() {
@@ -133,44 +402,188 @@ export class FamilyCalendarCard extends LitElement {
     }
 
     try {
-      // Initialize menu cache service
       await menuCacheService.initializeCache();
       this._menuData = menuCacheService.getCachedMenu();
+      await this._fetchCalendarEvents();
     } catch (error) {
-      console.error("Error initializing menu data:", error);
-      this._error = "Failed to load menu data";
+      console.error("Error initializing:", error);
+      this._error = "Failed to initialize calendar";
     }
   }
 
-  updated(changedProps: Map<string, any>) {
-    super.updated(changedProps);
-    this._debugLayout();
-    if (changedProps.has("config") || changedProps.has("hass")) {
-      this._initializeCard();
-      this._fetchCalendarEvents();
+  async firstUpdated() {
+    console.log("First updated called");
+    await this._initializeCalendar();
+    // Fetch events again after calendar is initialized
+    await this._fetchCalendarEvents();
+  }
+
+  private async _initializeCalendar() {
+    if (!this.calendarEl) {
+      console.error("Calendar element not found");
+      return;
     }
-    this.updateDebugInfo();
+
+    console.log("Initializing calendar with element:", this.calendarEl);
+
+    const calendarOptions: CalendarOptions = {
+      plugins: [
+        timeGridPlugin,
+        dayGridPlugin,
+        interactionPlugin,
+        scrollGridPlugin,
+      ],
+      initialView: "timeGridFourDay",
+      headerToolbar: {
+        left: "prev,next today",
+        center: "title",
+        right: "",
+      },
+      views: {
+        timeGridFourDay: {
+          type: "timeGrid",
+          duration: { days: 4 },
+          buttonText: "4 Day",
+          dayHeaderFormat: { weekday: "short", day: "numeric" },
+          allDaySlot: true,
+          allDayText: "All Day",
+          slotDuration: "01:00:00", // Changed to 1-hour slots
+          slotLabelInterval: "01:00",
+          slotMinTime: "06:00:00",
+          slotMaxTime: "20:00:00",
+          scrollTime: "08:00:00", // Start scrolled to 8 AM
+          slotLabelFormat: {
+            hour: "numeric",
+            minute: "2-digit",
+            omitZeroMinute: true,
+            hour12: true,
+          },
+        },
+      },
+      height: "100%",
+      expandRows: true,
+      nowIndicator: true,
+      dayMinWidth: 200,
+      allDayMaintainDuration: true,
+      eventMinHeight: 35, // Increased minimum height
+      eventShortHeight: 40, // Increased short height
+      eventOrder: "start,-duration,allDay,title",
+      eventTimeFormat: {
+        hour: "numeric",
+        minute: "2-digit",
+        meridiem: "short",
+      },
+      eventContent: (arg) => {
+        const timeText = arg.timeText;
+        const title = arg.event.title;
+        const type = arg.event.extendedProps?.type;
+        const start = arg.event.start?.getTime() ?? 0;
+        const end = arg.event.end?.getTime() ?? start;
+        const duration = end - start;
+        const showTime = duration >= 60 * 60 * 1000; // Show time for events 1 hour or longer
+
+        if (type === "meal") {
+          return {
+            html: `<div class="fc-event-main-content">
+                    <div class="fc-event-title">🍽️ ${title}</div>
+                  </div>`,
+          };
+        }
+
+        return {
+          html: `<div class="fc-event-main-content">
+                  <div class="fc-event-title">${title}</div>
+                  ${
+                    !arg.event.allDay && showTime
+                      ? `<div class="fc-event-time">${timeText}</div>`
+                      : ""
+                  }
+                </div>`,
+        };
+      },
+    };
+
+    this.calendar = new Calendar(this.calendarEl, calendarOptions);
+    console.log("Calendar instance created:", this.calendar);
+
+    // Add initial events
+    const events = this._getCalendarEvents();
+    console.log("Initial events:", events);
+    this.calendar.addEventSource(events);
+
+    this.calendar.render();
+    console.log("Calendar rendered");
+  }
+
+  private _getCalendarEvents(): EventSourceInput {
+    const events: EventInput[] = [];
+
+    // Add meal plan events at the top
+    if (this._menuData) {
+      events.push(
+        ...this._menuData.map((menu) => ({
+          title: menu.items.join(", "),
+          start: `${menu.date}`,
+          end: `${menu.date}`,
+          backgroundColor: "rgb(255, 243, 224)", // Light yellow for meal events
+          textColor: "black",
+          display: "block",
+          allDay: true,
+          extendedProps: {
+            type: "meal",
+            order: 1,
+          },
+        })),
+      );
+    }
+
+    // Add regular calendar events
+    if (this._events) {
+      events.push(
+        ...this._events.map((event) => {
+          const isAllDay =
+            (event.start.getHours() === 0 &&
+              event.start.getMinutes() === 0 &&
+              event.end.getHours() === 0 &&
+              event.end.getMinutes() === 0) ||
+            event.end.getTime() - event.start.getTime() >= 24 * 60 * 60 * 1000;
+
+          const backgroundColor = this._getEventClass(event);
+
+          return {
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            allDay: isAllDay,
+            backgroundColor,
+            textColor: "black",
+            extendedProps: {
+              calendar: event.calendar,
+              location: event.location,
+              description: event.description,
+              type: "regular",
+              order: 2,
+            },
+          };
+        }),
+      );
+    }
+
+    return events;
   }
 
   private async _fetchCalendarEvents() {
     if (!this.config?.entities || !this.hass) {
-      console.log("Config or hass not ready:", {
-        config: this.config,
-        hass: !!this.hass,
-      });
+      console.warn("No config or hass available");
       return;
     }
+
+    console.log("Fetching calendar events for entities:", this.config.entities);
 
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date(start);
-    end.setDate(end.getDate() + 5);
-
-    console.log("Fetching events for:", {
-      entities: this.config.entities,
-      start: start.toISOString(),
-      end: end.toISOString(),
-    });
+    end.setDate(end.getDate() + 30);
 
     try {
       const events: CalendarEvent[] = [];
@@ -182,375 +595,84 @@ export class FamilyCalendarCard extends LitElement {
         }
 
         try {
-          const result: GoogleCalendarEvent[] = await this.hass.callApi(
+          console.log(`Fetching events for ${entityId}`);
+          const result = await this.hass.callApi<HACalendarEvent[]>(
             "GET",
             `calendars/${entityId}?start=${start.toISOString()}&end=${end.toISOString()}`,
           );
+          console.log(`Received events for ${entityId}:`, result);
 
-          console.log(`Events received for ${entityId}:`, result);
-
-          const calendarEvents = result.map((event) => {
-            // Handle potential undefined values
-            const startDateTime =
-              event.start.dateTime || event.start.date || "";
-            const endDateTime = event.end.dateTime || event.end.date || "";
-
-            return {
-              start: new Date(startDateTime),
-              end: new Date(endDateTime),
-              title: event.summary,
-              calendar: entityId,
-              location: event.location,
-              color: event.colorId,
-            };
-          });
+          const calendarEvents = result.map((event) => ({
+            start: new Date(event.start.dateTime || event.start.date || ""),
+            end: new Date(event.end.dateTime || event.end.date || ""),
+            title: event.summary,
+            calendar: entityId,
+            location: event.location,
+            description: event.description,
+            color: event.colorId ? this._getCalendarColor(entityId) : undefined,
+          }));
           events.push(...calendarEvents);
         } catch (error) {
           console.error(`Error fetching events for ${entityId}:`, error);
         }
       }
 
-      console.log("Final processed events:", events);
+      console.log("All events fetched:", events);
       this._events = events;
+
+      if (this.calendar) {
+        console.log("Updating calendar with new events");
+        this.calendar.removeAllEvents();
+        const calendarEvents = this._getCalendarEvents();
+        console.log("Calendar events to add:", calendarEvents);
+        this.calendar.addEventSource(calendarEvents);
+      } else {
+        console.warn("Calendar not initialized when trying to update events");
+      }
     } catch (error) {
       console.error("Error in _fetchCalendarEvents:", error);
       this._error = "Failed to load calendar events";
     }
   }
 
-  firstUpdated() {
-    const container = this.shadowRoot?.querySelector(".calendar-card");
-    if (container) {
-      container.scrollTop = 1000; // Scroll to 10am
-    }
-    this.updateDebugInfo();
-  }
-
-  private _scrollToBusinessHours() {
-    requestAnimationFrame(() => {
-      const container = this.shadowRoot?.querySelector(".calendar-card");
-      if (container) {
-        // Scroll to 7am minus 15 minutes
-        const scrollTop = 7 * 60 - 15;
-        container.scrollTop = scrollTop;
-      }
-    });
-  }
-
   private _getCalendarColor(calendarId: string): string {
-    // Get the actual calendar entity
     const calendar = this.hass?.states[calendarId];
     if (calendar?.attributes?.color) {
       return calendar.attributes.color;
     }
 
-    // Fallback colors if no color is set in the calendar entity
+    // Pastel color palette
     const colors = {
-      "calendar.personal": "#039be5",
-      "calendar.work": "#7986cb",
-      "calendar.family": "#33b679",
-      "calendar.holidays": "#8e24aa",
-      default: "#039be5",
+      "calendar.personal": "var(--fc-event-blue-color)",
+      "calendar.work": "var(--fc-event-purple-color)",
+      "calendar.family": "var(--fc-event-green-color)",
+      "calendar.holidays": "var(--fc-event-yellow-color)",
+      default: "var(--fc-event-default-color)",
     };
 
     return colors[calendarId] || colors.default;
   }
 
-  private _getEventStyle(event: CalendarEvent, dayStart: Date): string {
-    const startMinutes = event.start.getHours() * 60 + event.start.getMinutes();
-    const endMinutes = event.end.getHours() * 60 + event.end.getMinutes();
-    let duration = endMinutes - startMinutes;
-
-    // Ensure minimum height
-    duration = Math.max(duration, 30);
-
-    // Convert to pixels (100px per hour = 1.666667px per minute)
-    const top = (startMinutes * 100) / 60 + 80; // Add header height
-    const height = (duration * 100) / 60;
-
-    // Get color from Google Calendar colors
-    let backgroundColor = "#039be5"; // Default color
-    if (this._colors?.event && event.color) {
-      backgroundColor =
-        this._colors.event[event.color]?.background || backgroundColor;
-    }
-
-    return `top: ${top}px; height: ${height}px; background-color: ${backgroundColor};`;
-  }
-
-  private _formatTime(date: Date): string {
-    const hours = date.getHours() % 12 || 12;
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const meridiem = date.getHours() >= 12 ? "pm" : "am";
-    return `${hours}:${minutes} ${meridiem}`;
-  }
-
-  private _isAllDayEvent(event: CalendarEvent): boolean {
-    // Check if the start time is midnight and end time is midnight (or 23:59:59) of another day
-    const startIsDate =
-      event.start.getHours() === 0 &&
-      event.start.getMinutes() === 0 &&
-      event.start.getSeconds() === 0;
-
-    const endIsDate =
-      (event.end.getHours() === 0 &&
-        event.end.getMinutes() === 0 &&
-        event.end.getSeconds() === 0) ||
-      (event.end.getHours() === 23 &&
-        event.end.getMinutes() === 59 &&
-        event.end.getSeconds() === 59);
-
-    return startIsDate && endIsDate;
-  }
-
-  private _getAllDayEvents(date: Date): TemplateResult | typeof nothing {
-    if (!this._events) {
-      return nothing;
-    }
-
-    const dayEvents = this._events.filter(
-      (event) =>
-        this._isAllDayEvent(event) &&
-        event.start.toDateString() === date.toDateString(),
-    );
-
-    if (dayEvents.length === 0) {
-      return nothing;
-    }
-
-    return html`
-      ${dayEvents.map(
-        (event) => html` <div class="event all-day">${event.title}</div> `,
-      )}
-    `;
-  }
-
-  private _getEventsForDay(date: Date): TemplateResult[] {
-    if (!this._events) {
-      return [];
-    }
-
-    // Only return non-all-day events for the regular grid
-    return this._events
-      .filter(
-        (event) =>
-          !this._isAllDayEvent(event) && // Exclude all-day events
-          event.start.getDate() === date.getDate() &&
-          event.start.getMonth() === date.getMonth() &&
-          event.start.getFullYear() === date.getFullYear(),
-      )
-      .map((event) => {
-        const startDate = new Date(event.start);
-        const endDate = new Date(event.end);
-
-        const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
-        const endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
-        const duration = Math.max(endMinutes - startMinutes, 30); // Minimum 30 minutes
-
-        // Convert to pixels (100px per hour = 1.666667px per minute)
-        const top = (startMinutes * 100) / 60 + 80; // Add header height
-        const height = (duration * 100) / 60;
-
-        return html`
-          <div
-            class="event"
-            style="top: ${top}px; height: ${height}px; ${event.color
-              ? `background-color: ${event.color};`
-              : ""}"
-          >
-            <div>${event.title}</div>
-            <div class="event-time">
-              ${this._formatTime(startDate)} - ${this._formatTime(endDate)}
-            </div>
-          </div>
-        `;
-      });
-  }
-
-  private _getDays(): Date[] {
-    const today = new Date();
-    const days: Date[] = [];
-
-    // Generate 5 days starting from today
-    for (let i = 0; i < 5; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      days.push(date);
-    }
-
-    return days;
-  }
-
-  private _getMealPlan(date: Date): TemplateResult | typeof nothing {
-    if (!this._menuData) {
-      console.log("No menu data available yet");
-      return html` <div class="event meal-plan error">Loading menu...</div> `;
-    }
-
-    // Format the date to match the API date format (YYYY-MM-DD)
-    const dateStr = date.toISOString().split("T")[0];
-
-    const dayMenu = this._menuData.find((menu: any) => menu.date === dateStr);
-
-    if (!dayMenu || !dayMenu.items.length) {
-      return nothing;
-    }
-
-    return html`
-      <div class="event meal-plan">
-        ${dayMenu.items.map(
-          (item: string) => html` <div class="menu-item">${item}</div> `,
-        )}
-      </div>
-    `;
-  }
-
-  private _syncHeaderScroll(e: Event) {
-    const headerContainer = e.target as HTMLElement;
-    const mainContainer = this.shadowRoot?.querySelector(
-      ".main-scroll-container",
-    );
-    if (mainContainer) {
-      mainContainer.scrollLeft = headerContainer.scrollLeft;
-    }
-  }
-
-  private _syncMainScroll(e: Event) {
-    const mainContainer = e.target as HTMLElement;
-    const headerContainer = this.shadowRoot?.querySelector(
-      ".header-scroll-container",
-    );
-    if (headerContainer) {
-      headerContainer.scrollLeft = mainContainer.scrollLeft;
-    }
-  }
-
-  private _renderTimeColumn(): TemplateResult {
-    const timeSlots = Array.from({ length: 23 }, (_, i) => {
-      const hour = (i + 1) % 12 || 12;
-      const meridiem = i < 11 ? "am" : "pm";
-      return `${hour} ${meridiem}`;
-    });
-
-    return html`
-      <div class="time-column">
-        ${timeSlots.map(
-          (time, i) => html`
-            <div class="time-slot" style="top: ${100 + i * 100 + 50}px">
-              ${time}
-            </div>
-          `,
-        )}
-      </div>
-    `;
-  }
-
-  private _renderDayColumn(day: Date): TemplateResult {
-    return html`
-      <div class="day-column">
-        ${Array.from(
-          { length: 24 },
-          (_, i) => html`
-            <div
-              class="hour-line"
-              style="top: calc(${i} * var(--hour-height))"
-            ></div>
-          `,
-        )}
-        ${this._getEventsForDay(day)}
-      </div>
-    `;
-  }
-
-  private _renderDayColumnHeader(day: Date, index: number): TemplateResult {
-    return html`
-      <div
-        class="day-column-header"
-        data-column-index="${index}"
-        data-computed-width="${this.shadowRoot?.querySelector(
-          `.day-column-header:nth-child(${index + 1})`,
-        )?.clientWidth}"
-      >
-        ${day
-          .toLocaleDateString("en-US", {
-            weekday: "short",
-            day: "numeric",
-          })
-          .replace(",", "")}
-      </div>
-    `;
-  }
-
-  private async updateDebugInfo() {
-    // Wait for next render cycle
-    await this.updateComplete;
-
-    // Wait one more frame to ensure sizes are calculated
-    requestAnimationFrame(() => {
-      const containers = [
-        ".header-content",
-        ".all-day-content",
-        ".meal-plan-content",
-        ".main-content",
-      ];
-
-      containers.forEach((selector) => {
-        const element = this.shadowRoot?.querySelector(selector);
-        if (element) {
-          const totalWidth = element.getBoundingClientRect().width;
-          const timeColWidth = 60;
-          const availableWidth = totalWidth; // Don't subtract timeColWidth since it's absolute
-          const columnWidth = availableWidth / 5;
-
-          element.setAttribute(
-            "data-width",
-            `Total: ${Math.round(totalWidth)}px | Column: ${Math.round(
-              columnWidth,
-            )}px`,
-          );
+  private _getEventClass(event: CalendarEvent): string {
+    // First check text filters if configured
+    if (this.config.color_filters) {
+      for (const filter of this.config.color_filters) {
+        if (event.title.toLowerCase().includes(filter.pattern.toLowerCase())) {
+          // Return the color directly for RGB values
+          return filter.color;
         }
-      });
-    });
-  }
-
-  private _debugLayout() {
-    requestAnimationFrame(() => {
-      const elements = {
-        headerContent: this.shadowRoot?.querySelector(".header-content"),
-        headerColumns: this.shadowRoot?.querySelectorAll(".day-column-header"),
-        mainContent: this.shadowRoot?.querySelector(".main-content"),
-        dayColumns: this.shadowRoot?.querySelectorAll(".day-column"),
-      };
-
-      console.group("Layout Debug");
-      console.log("Header Content Width:", elements.headerContent?.clientWidth);
-      console.log("Main Content Width:", elements.mainContent?.clientWidth);
-
-      elements.headerColumns?.forEach((col, i) => {
-        console.log(`Header Column ${i} Width:`, col.clientWidth);
-      });
-
-      elements.dayColumns?.forEach((col, i) => {
-        console.log(`Day Column ${i} Width:`, col.clientWidth);
-      });
-      console.groupEnd();
-    });
-  }
-
-  private _setupResizeObserver() {
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        console.log(`${entry.target.className} size:`, {
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
       }
-    });
+    }
 
-    ["header-content", "main-content"].forEach((className) => {
-      const element = this.shadowRoot?.querySelector(`.${className}`);
-      if (element) observer.observe(element);
-    });
+    // Fall back to calendar-based colors if no filter match
+    const defaultColors = {
+      "calendar.personal": "rgb(3, 155, 229)", // David's blue
+      "calendar.work": "rgb(142, 36, 170)", // Calli's purple
+      "calendar.family": "rgb(51, 182, 121)", // Jess's green
+      "calendar.holidays": "rgb(230, 124, 115)", // Cambria's color
+    };
+
+    return defaultColors[event.calendar] || "rgb(3, 155, 229)"; // Default to blue
   }
 
   render() {
@@ -558,104 +680,31 @@ export class FamilyCalendarCard extends LitElement {
       return html``;
     }
 
-    const days = this._getDays();
-
     return html`
       <ha-card>
-        <div class="calendar-card">
-          <div
-            class="header-scroll-container"
-            @scroll=${this._syncHeaderScroll}
-          >
-            <div class="header-content">
-              ${days.map(
-                (day) => html`
-                  <div class="day-column-header">
-                    ${day
-                      .toLocaleDateString("en-US", {
-                        weekday: "short",
-                        day: "numeric",
-                      })
-                      .replace(",", "")}
-                  </div>
-                `,
-              )}
-            </div>
-          </div>
-
-          <div class="all-day-scroll-container">
-            <div class="all-day-content">
-              ${days.map(
-                (day) => html`
-                  <div class="all-day-column">
-                    ${this._getAllDayEvents(day)}
-                  </div>
-                `,
-              )}
-            </div>
-          </div>
-
-          <div class="meal-plan-scroll-container">
-            <div class="meal-plan-content">
-              ${days.map(
-                (day) => html`
-                  <div class="meal-plan-column">${this._getMealPlan(day)}</div>
-                `,
-              )}
-            </div>
-          </div>
-
-          <div class="main-scroll-container" @scroll=${this._syncMainScroll}>
-            <div class="time-column">
-              ${Array.from(
-                { length: 24 },
-                (_, i) => html`
-                  <div class="time-slot" style="top: ${i * 60}px">
-                    ${i === 0
-                      ? "12 am"
-                      : i < 12
-                      ? `${i} am`
-                      : i === 12
-                      ? "12 pm"
-                      : `${i - 12} pm`}
-                  </div>
-                `,
-              )}
-            </div>
-            ${days.map((day) => this._renderDayColumn(day))}
-          </div>
-        </div>
+        ${this._error ? html`<div class="error">${this._error}</div>` : ""}
+        <div id="calendar"></div>
       </ha-card>
     `;
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener("resize", () => this.updateDebugInfo());
+    if (this.calendar) {
+      this.calendar.destroy();
+    }
   }
 }
 
-// Then handle the registration
+// Register the element
 if (!customElements.get("family-calendar-card")) {
   customElements.define("family-calendar-card", FamilyCalendarCard);
+  console.info(
+    "%c FAMILY-CALENDAR-CARD %c Version 1.0.0 ",
+    "color: orange; font-weight: bold; background: black",
+    "color: white; font-weight: bold; background: dimgray",
+  );
 }
 
-// Register with Home Assistant's custom cards registry
-if (!(window as any).customCards) {
-  (window as any).customCards = [];
-}
-
-if (
-  !(window as any).customCards.find(
-    (card: any) => card.type === "family-calendar-card",
-  )
-) {
-  (window as any).customCards.push({
-    type: "family-calendar-card",
-    name: "Family Calendar Card",
-    description: "A calendar card for family scheduling",
-    version: __BUILD_VERSION__,
-  });
-}
-
-console.info(`Family Calendar Card version ${__BUILD_VERSION__} loaded`);
+// Export for TypeScript
+export default FamilyCalendarCard;

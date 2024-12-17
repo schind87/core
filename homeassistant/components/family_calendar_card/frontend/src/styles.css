@@ -1,0 +1,139 @@
+/* FullCalendar Base Styles */
+.fc {
+  direction: ltr;
+  text-align: left;
+}
+
+.fc table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 1em;
+}
+
+.fc th,
+.fc td {
+  vertical-align: top;
+  padding: 0;
+}
+
+/* TimeGrid View */
+.fc-timegrid .fc-daygrid-body {
+  position: relative;
+  z-index: 1;
+}
+
+.fc-timegrid-axis {
+  position: relative;
+}
+
+.fc-timegrid-slot {
+  height: 1.5em;
+  border-bottom: 0;
+}
+
+.fc-timegrid-slot-minor {
+  border-top-style: none;
+}
+
+.fc-timegrid-slot-label-cushion {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.fc-timegrid-axis-cushion {
+  padding: 0 4px;
+}
+
+.fc-timegrid-now-indicator-line {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 1px 0 0;
+}
+
+.fc-timegrid-now-indicator-arrow {
+  position: absolute;
+  z-index: 4;
+  margin-top: -5px;
+  border-style: solid;
+}
+
+/* DayGrid View */
+.fc-daygrid-day-frame {
+  position: relative;
+  min-height: 100%;
+}
+
+.fc-daygrid-day-top {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.fc-daygrid-day-number {
+  padding: 4px;
+}
+
+/* Event Styling */
+.fc-event {
+  position: relative;
+  display: block;
+  font-size: 0.85em;
+  line-height: 1.4;
+  border-radius: 3px;
+  border: 1px solid #3788d8;
+}
+
+.fc-event-main {
+  position: relative;
+  z-index: 1;
+  padding: 2px;
+}
+
+.fc-event-title {
+  padding: 0 1px;
+  white-space: nowrap;
+}
+
+.fc-event-time {
+  font-size: 0.85em;
+  white-space: nowrap;
+  padding: 0 1px;
+}
+
+/* Toolbar */
+.fc-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fc-toolbar-title {
+  font-size: 1.75em;
+  margin: 0;
+}
+
+/* Button Styling */
+.fc-button {
+  display: inline-block;
+  font-weight: 400;
+  text-align: center;
+  vertical-align: middle;
+  user-select: none;
+  padding: 0.4em 0.65em;
+  font-size: 1em;
+  line-height: 1.5;
+  border-radius: 4px;
+}
+
+/* Grid Structure */
+.fc-scrollgrid {
+  width: 100%;
+  border-collapse: separate;
+  border-right-width: 0;
+}
+
+.fc-scrollgrid-section > * {
+  border-width: 0;
+}

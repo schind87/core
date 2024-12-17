@@ -5,18 +5,23 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "node build.js && rollup -c && cp -v dist/* /workspaces/core/config/www/community/family-calendar-card/",
+    "build": "rollup -c && cp -v dist/* /workspaces/core/config/www/ && cat dist/styles.css >> /workspaces/core/config/www/family-calendar-card.js",
     "watch": "rollup -c --watch",
-    "watch:dev": "echo Starting dev watch && concurrently \"npm run watch\" \"onchange -d 1000 'dist/family-calendar-card.js' -- sh -c 'TIMESTAMP=`TZ=America/New_York date +%Y-%m-%d_%H:%M:%S` && cp -vf dist/* /workspaces/core/config/www/community/family-calendar-card/ > /dev/null 2>&1 && echo New version built: 0.0.1-dev.$TIMESTAMP'\""
+    "watch:dev": "echo Starting dev watch && concurrently \"npm run watch\" \"onchange -d 1000 'dist/family-calendar-card.js' -- sh -c 'TIMESTAMP=`TZ=America/New_York date +%Y-%m-%d_%H:%M:%S` && cp -vf dist/* /workspaces/core/config/www/ && cat dist/styles.css >> /workspaces/core/config/www/family-calendar-card.js > /dev/null 2>&1 && echo New version built: 0.0.1-dev.$TIMESTAMP'\""
   },
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "@fullcalendar/core": "^6.1.10",
+    "@fullcalendar/daygrid": "^6.1.10",
+    "@fullcalendar/timegrid": "^6.1.10",
+    "@fullcalendar/list": "^6.1.10",
+    "@fullcalendar/interaction": "^6.1.10",
+    "@fullcalendar/scrollgrid": "^6.1.10",
     "axios": "^1.7.9",
     "custom-card-helpers": "^1.9.0",
     "lit": "^3.0.0",
-    "lru-cache": "^10.0.0",
-    "swiper": "^11.1.15"
+    "lru-cache": "^10.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.8",
@@ -25,7 +30,6 @@
     "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-typescript": "^11.1.6",
     "@types/node": "^20.0.0",
-    "@types/swiper": "^6.0.0",
     "concurrently": "^8.2.2",
     "home-assistant-js-websocket": "^9.1.0",
     "onchange": "^7.1.0",
