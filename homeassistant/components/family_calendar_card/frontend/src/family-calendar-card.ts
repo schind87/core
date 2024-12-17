@@ -181,13 +181,16 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       padding: 8px 4px;
       background: transparent;
       border-right: 1px solid var(--fc-border-color) !important;
+      text-align: left;
     }
 
     .fc .fc-col-header-cell-cushion {
-      padding: 4px;
+      padding: 4px 8px;
       color: black;
       font-weight: 600;
       font-size: 3em;
+      text-align: left;
+      text-decoration: none !important;
     }
 
     /* Time grid styling */
@@ -230,14 +233,30 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       border: none !important;
     }
 
+    /* Time label styling */
     .fc .fc-timegrid-axis-cushion,
     .fc .fc-timegrid-slot-label-cushion {
       color: black;
       font-size: 1.5em;
       font-weight: 400;
-      padding-right: 8px;
-      transform: translateY(-100%);
+      padding: 4px 8px;
       text-transform: lowercase;
+      text-align: right;
+      position: relative;
+      width: auto;
+    }
+
+    /* Ensure time labels are properly positioned */
+    .fc .fc-timegrid-slot-label {
+      vertical-align: top;
+      text-align: right;
+      position: relative;
+      padding-right: 8px;
+    }
+
+    .fc .fc-timegrid-axis.fc-scrollgrid-shrink {
+      text-align: right;
+      padding-right: 8px;
     }
 
     /* Remove horizontal lines between time slots in the axis */
@@ -305,21 +324,34 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     /* Toolbar buttons */
     .fc .fc-button {
       background: transparent;
-      border: none;
+      border: 1px solid rgba(0, 0, 0, 0.1);
       color: black;
       text-transform: uppercase;
       font-weight: 600;
       font-size: 0.9em;
       padding: 6px 12px;
+      border-radius: 4px;
+      margin: 0 4px;
     }
 
     .fc .fc-button:hover {
       background: rgba(0, 0, 0, 0.06);
+      border-color: rgba(0, 0, 0, 0.2);
     }
 
-    .fc .fc-button-active {
+    .fc .fc-button-active,
+    .fc .fc-today-button {
       background: var(--primary-color) !important;
+      border-color: var(--primary-color) !important;
       color: white !important;
+    }
+
+    .fc .fc-button:disabled {
+      opacity: 0.6;
+      cursor: default;
+      background: rgba(0, 0, 0, 0.06) !important;
+      border-color: rgba(0, 0, 0, 0.1) !important;
+      color: rgba(0, 0, 0, 0.6) !important;
     }
 
     /* Scrollbar styling */
@@ -415,7 +447,11 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
           type: "timeGrid",
           duration: { days: 5 },
           buttonText: "5 Day",
-          dayHeaderFormat: { weekday: "short", day: "numeric" },
+          dayHeaderFormat: {
+            weekday: "short", // 'Tue'
+            day: "numeric", // '17'
+            separator: " ", // Space between weekday and day
+          },
           allDaySlot: true,
           allDayText: "All Day",
           slotDuration: "01:00:00", // Changed to 1-hour slots
