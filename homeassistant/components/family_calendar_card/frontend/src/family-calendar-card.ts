@@ -316,46 +316,51 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       font-weight: 400;
     }
 
-    /* All-day section styling */
+    /* All-day section containers */
     .fc .fc-daygrid-body {
       border-bottom: 2px solid var(--fc-border-color) !important;
     }
 
     /* Container for all-day events */
     .fc .fc-daygrid-day-frame {
-      display: flex !important;
-      flex-direction: column !important;
-      padding: 4px !important;
+      display: grid !important;
+      grid-template-rows: auto auto !important;
       gap: 8px !important;
+      padding: 4px !important;
     }
 
-    /* Create two distinct sections */
+    /* Event sections */
     .fc .fc-daygrid-day-events {
       display: flex !important;
       flex-direction: column !important;
       gap: 8px !important;
+      padding: 4px !important;
     }
 
-    /* Meal events section */
-    .fc .fc-daygrid-day-events .meal-events-container {
+    /* Meal events wrapper */
+    .meal-events-wrapper {
       border: 2px solid #ff0000 !important;
-      min-height: 40px !important;
       padding: 4px !important;
-      margin: 2px !important;
+      min-height: 40px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: flex-end !important;
     }
 
-    /* All-day events section */
-    .fc .fc-daygrid-day-events .all-day-events-container {
+    /* All-day events wrapper */
+    .all-day-events-wrapper {
       border: 2px solid #0000ff !important;
-      min-height: 40px !important;
       padding: 4px !important;
-      margin: 2px !important;
+      min-height: 40px !important;
+      display: flex !important;
+      flex-direction: column !important;
     }
 
     /* Event styling */
     .fc-daygrid-event {
       border: none !important;
       margin: 2px 0 !important;
+      padding: 4px !important;
     }
 
     .fc-daygrid-block-event {
@@ -381,6 +386,19 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
 
     .fc .fc-daygrid-event:not([data-event-type="meal"]) {
       margin: 0 !important;
+    }
+
+    /* Multi-day event styling */
+    .fc .fc-daygrid-event.fc-event-start {
+      margin-left: 2px !important;
+      border-top-left-radius: 12px !important;
+      border-bottom-left-radius: 12px !important;
+    }
+
+    .fc .fc-daygrid-event.fc-event-end {
+      margin-right: 2px !important;
+      border-top-right-radius: 12px !important;
+      border-bottom-right-radius: 12px !important;
     }
 
     /* Remove the debug border */
@@ -566,25 +584,23 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
         const start = arg.event.start?.getTime() ?? 0;
         const end = arg.event.end?.getTime() ?? start;
         const duration = end - start;
-        const showTime = duration >= 60 * 60 * 1000; // Show time for events 1 hour or longer
+        const showTime = duration >= 60 * 60 * 1000;
 
         if (type === "meal") {
           return {
-            html: `<div class="meal-events-container">
-                    <div class="fc-event-main-content">
-                      <div class="fc-event-title">${title}</div>
-                    </div>
+            html: `<div class="fc-event-main-content">
+                    <div class="fc-event-title">${title}</div>
                   </div>`,
+            classNames: ["meal-event"],
           };
         }
 
         if (arg.event.allDay) {
           return {
-            html: `<div class="all-day-events-container">
-                    <div class="fc-event-main-content">
-                      <div class="fc-event-title">${title}</div>
-                    </div>
+            html: `<div class="fc-event-main-content">
+                    <div class="fc-event-title">${title}</div>
                   </div>`,
+            classNames: ["all-day-event"],
           };
         }
 
@@ -598,6 +614,47 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
                   }
                 </div>`,
         };
+      },
+      dayCellDidMount: (info) => {
+        const dayEl = info.el;
+        const eventsContainer = dayEl.querySelector(".fc-daygrid-day-events");
+        if (!eventsContainer) return;
+
+        // Create wrapper divs
+        const mealWrapper = document.createElement("div");
+        mealWrapper.className = "meal-events-wrapper";
+        const allDayWrapper = document.createElement("div");
+        allDayWrapper.className = "all-day-events-wrapper";
+
+        // Replace the events container content with our wrappers
+        eventsContainer.innerHTML = "";
+        eventsContainer.appendChild(mealWrapper);
+        eventsContainer.appendChild(allDayWrapper);
+
+        // Find any existing events and move them to appropriate wrappers
+        const events = dayEl.querySelectorAll(".fc-daygrid-event");
+        events.forEach((event) => {
+          if (event.classList.contains("meal-event")) {
+            mealWrapper.appendChild(event);
+          } else if (event.classList.contains("all-day-event")) {
+            allDayWrapper.appendChild(event);
+          }
+        });
+      },
+      eventDidMount: (info) => {
+        const eventEl = info.el;
+        const type = info.event.extendedProps?.type;
+        const dayEl = eventEl.closest(".fc-daygrid-day");
+        if (!dayEl) return;
+
+        const mealWrapper = dayEl.querySelector(".meal-events-wrapper");
+        const allDayWrapper = dayEl.querySelector(".all-day-events-wrapper");
+
+        if (type === "meal" && mealWrapper) {
+          mealWrapper.appendChild(eventEl);
+        } else if (info.event.allDay && allDayWrapper) {
+          allDayWrapper.appendChild(eventEl);
+        }
       },
     };
 
@@ -616,7 +673,7 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
   private _getCalendarEvents(): EventSourceInput {
     const events: EventInput[] = [];
 
-    // Add meal plan events at the top
+    // Add meal plan events
     if (this._menuData) {
       events.push(
         ...this._menuData
@@ -635,9 +692,7 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
             classNames: ["meal-event"],
             extendedProps: {
               type: "meal",
-              order: 2,
             },
-            dataEventType: "meal",
           })),
       );
     }
@@ -670,14 +725,106 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
                 location: event.location,
                 description: event.description,
                 type: "regular",
-                order: 2,
               },
             };
           }),
       );
     }
 
+    // Analyze events and update wrapper heights
+    const { maxMealEvents, maxAllDayEvents } = this._analyzeEvents(events);
+    this._updateWrapperHeights(maxMealEvents, maxAllDayEvents);
+
     return events;
+  }
+
+  private _analyzeEvents(events: EventInput[]): {
+    maxMealEvents: number;
+    maxAllDayEvents: number;
+  } {
+    const dayMap = new Map<string, { meals: number; allDay: number }>();
+
+    events.forEach((event) => {
+      const startDate = new Date(event.start as string);
+      const endDate = event.end
+        ? new Date(event.end as string)
+        : new Date(startDate);
+
+      // For all-day events, adjust the end date to be inclusive
+      if (event.allDay && endDate) {
+        endDate.setDate(endDate.getDate() - 1);
+      }
+
+      // Iterate through each day of the event
+      for (
+        let date = new Date(startDate);
+        date <= endDate;
+        date.setDate(date.getDate() + 1)
+      ) {
+        const dateStr = date.toDateString();
+        const dayStats = dayMap.get(dateStr) || { meals: 0, allDay: 0 };
+
+        if (event.extendedProps?.type === "meal") {
+          dayStats.meals++;
+        } else if (event.allDay) {
+          dayStats.allDay++;
+        }
+
+        dayMap.set(dateStr, dayStats);
+      }
+    });
+
+    // Get the current week's start and end dates
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    let maxMealEvents = 0;
+    let maxAllDayEvents = 0;
+
+    // Only consider events within the current week
+    dayMap.forEach((stats, dateStr) => {
+      const date = new Date(dateStr);
+      if (date >= startOfWeek && date <= endOfWeek) {
+        maxMealEvents = Math.max(maxMealEvents, stats.meals);
+        maxAllDayEvents = Math.max(maxAllDayEvents, stats.allDay);
+      }
+    });
+
+    return { maxMealEvents, maxAllDayEvents };
+  }
+
+  private _updateWrapperHeights(
+    maxMealEvents: number,
+    maxAllDayEvents: number,
+  ) {
+    const existingStyle = document.getElementById("calendar-wrapper-heights");
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+
+    // Calculate fixed heights based on event counts
+    const mealHeight = Math.max(1, maxMealEvents) * 40;
+    const allDayHeight = Math.max(1, maxAllDayEvents) * 40;
+
+    const style = document.createElement("style");
+    style.id = "calendar-wrapper-heights";
+    style.textContent = `
+      .meal-events-wrapper {
+        min-height: ${mealHeight}px !important;
+        height: ${mealHeight}px !important;
+        max-height: ${mealHeight}px !important;
+        margin-bottom: 8px !important;
+      }
+      .all-day-events-wrapper {
+        min-height: ${allDayHeight}px !important;
+        height: ${allDayHeight}px !important;
+        max-height: ${allDayHeight}px !important;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   private async _fetchCalendarEvents() {
