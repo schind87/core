@@ -76,6 +76,10 @@ interface CalendarCardConfig {
   show_header?: boolean;
   title?: string;
   color_filters?: ColorFilter[];
+  view_range?: {
+    start: string; // Format: "HH:mm:ss"
+    end: string; // Format: "HH:mm:ss"
+  };
 }
 
 interface HACalendarEvent {
@@ -109,6 +113,10 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
         { pattern: "david", color: "LightSkyBlue" },
         { pattern: "cambria", color: "LightPink" },
       ],
+      view_range: {
+        start: "06:00:00",
+        end: "19:00:00",
+      },
     };
   }
 
@@ -309,62 +317,75 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     }
 
     /* All-day section styling */
-    .fc .fc-daygrid-day-frame {
+    .fc .fc-daygrid-body {
       border-bottom: 2px solid var(--fc-border-color) !important;
-      display: flex !important;
-      flex-direction: column !important;
     }
 
+    /* Container for all-day events */
+    .fc .fc-daygrid-day-frame {
+      display: flex !important;
+      flex-direction: column !important;
+      padding: 4px !important;
+      gap: 8px !important;
+    }
+
+    /* Create two distinct sections */
     .fc .fc-daygrid-day-events {
       display: flex !important;
       flex-direction: column !important;
-      margin: 0 !important;
+      gap: 8px !important;
     }
 
-    /* Position meal events at the bottom */
-    .fc .fc-daygrid-event[data-event-type="meal"] {
-      order: 2 !important;
-      margin-top: auto !important;
+    /* Meal events section */
+    .fc .fc-daygrid-day-events .meal-events-container {
+      border: 2px solid #ff0000 !important;
+      min-height: 40px !important;
+      padding: 4px !important;
+      margin: 2px !important;
     }
 
-    .fc .fc-daygrid-event:not([data-event-type="meal"]) {
-      order: 1 !important;
+    /* All-day events section */
+    .fc .fc-daygrid-day-events .all-day-events-container {
+      border: 2px solid #0000ff !important;
+      min-height: 40px !important;
+      padding: 4px !important;
+      margin: 2px !important;
     }
 
-    /* All-day event styling */
+    /* Event styling */
+    .fc-daygrid-event {
+      border: none !important;
+      margin: 2px 0 !important;
+    }
+
     .fc-daygrid-block-event {
-      margin: 1px 1px !important;
       min-height: 30px !important;
       display: flex !important;
       align-items: center !important;
     }
 
-    .fc-daygrid-block-event .fc-event-main-content {
-      padding: 2px;
-      display: flex !important;
-      align-items: center !important;
-      height: 100% !important;
+    /* Event content styling */
+    .fc-daygrid-event .fc-event-main {
+      padding: 2px !important;
     }
 
-    .fc-daygrid-block-event .fc-event-title {
+    .fc-daygrid-event .fc-event-title {
       font-weight: 400 !important;
       font-size: 1.5em !important;
     }
 
-    /* Regular event styling */
-    .fc-timegrid-event .fc-event-title,
-    .fc-daygrid-dot-event .fc-event-title {
-      font-weight: 600;
-      font-size: 2em;
-      color: black;
-      margin-bottom: 2px;
+    /* Event positioning */
+    .fc .fc-daygrid-event[data-event-type="meal"] {
+      margin: 0 !important;
     }
 
-    .fc-timegrid-event .fc-event-time,
-    .fc-daygrid-dot-event .fc-event-time {
-      font-size: 2em;
-      color: rgba(0, 0, 0, 0.7);
-      font-weight: 400;
+    .fc .fc-daygrid-event:not([data-event-type="meal"]) {
+      margin: 0 !important;
+    }
+
+    /* Remove the debug border */
+    .fc .fc-daygrid-day {
+      border: none !important;
     }
 
     /* Current time indicator */
@@ -511,17 +532,17 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
           duration: { days: 5 },
           buttonText: "5 Day",
           dayHeaderFormat: {
-            weekday: "short", // 'Tue'
-            day: "numeric", // '17'
-            separator: " ", // Space between weekday and day
+            weekday: "short",
+            day: "numeric",
+            separator: " ",
           },
           allDaySlot: true,
           allDayText: "All Day",
-          slotDuration: "01:00:00", // Changed to 1-hour slots
+          slotDuration: "01:00:00",
           slotLabelInterval: "01:00",
-          slotMinTime: "06:00:00",
-          slotMaxTime: "20:00:00",
-          scrollTime: "08:00:00", // Start scrolled to 8 AM
+          slotMinTime: "00:00:00",
+          slotMaxTime: "24:00:00",
+          scrollTime: this.config.view_range?.start || "06:00:00",
           slotLabelFormat: {
             hour: "numeric",
             minute: "2-digit",
@@ -535,14 +556,9 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       nowIndicator: true,
       dayMinWidth: 200,
       allDayMaintainDuration: true,
-      eventMinHeight: 35, // Increased minimum height
-      eventShortHeight: 40, // Increased short height
+      eventMinHeight: 35,
+      eventShortHeight: 40,
       eventOrder: "start,-duration,allDay,title",
-      eventTimeFormat: {
-        hour: "numeric",
-        minute: "2-digit",
-        meridiem: "short",
-      },
       eventContent: (arg) => {
         const timeText = arg.timeText;
         const title = arg.event.title;
@@ -554,8 +570,20 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
 
         if (type === "meal") {
           return {
-            html: `<div class="fc-event-main-content">
-                    <div class="fc-event-title">${title}</div>
+            html: `<div class="meal-events-container">
+                    <div class="fc-event-main-content">
+                      <div class="fc-event-title">${title}</div>
+                    </div>
+                  </div>`,
+          };
+        }
+
+        if (arg.event.allDay) {
+          return {
+            html: `<div class="all-day-events-container">
+                    <div class="fc-event-main-content">
+                      <div class="fc-event-title">${title}</div>
+                    </div>
                   </div>`,
           };
         }
@@ -564,7 +592,7 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
           html: `<div class="fc-event-main-content">
                   <div class="fc-event-title">${title}</div>
                   ${
-                    !arg.event.allDay && showTime
+                    showTime
                       ? `<div class="fc-event-time">${timeText}</div>`
                       : ""
                   }
