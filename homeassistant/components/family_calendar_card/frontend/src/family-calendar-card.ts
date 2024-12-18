@@ -139,13 +139,14 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       --fc-button-text-color: black;
       --fc-button-active-bg-color: var(--primary-color);
       --fc-button-active-text-color: white;
+      font-family: "Noto Sans", sans-serif;
     }
 
     ha-card {
       display: flex;
       flex-direction: column;
       height: 100%;
-      padding: 16px;
+      padding: 12px 0 0 12px;
       box-sizing: border-box;
       background: var(--ha-card-background, var(--card-background-color, #fff));
     }
@@ -180,14 +181,14 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     .fc .fc-col-header-cell {
       padding: 8px 4px;
       background: transparent;
-      border-right: 1px solid var(--fc-border-color) !important;
+      border-right: none !important;
       text-align: left;
     }
 
     .fc .fc-col-header-cell-cushion {
       padding: 4px 8px;
       color: black;
-      font-weight: 600;
+      font-weight: 500;
       font-size: 3em;
       text-align: left;
       text-decoration: none !important;
@@ -195,7 +196,7 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
 
     /* Time grid styling */
     .fc .fc-timegrid-slot {
-      height: 6em;
+      height: 7em;
       border-bottom: 1px solid var(--fc-border-color) !important;
     }
 
@@ -239,16 +240,18 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       color: black;
       font-size: 1.5em;
       font-weight: 400;
-      padding: 4px 8px;
+      padding: 0;
       text-transform: lowercase;
       text-align: right;
       position: relative;
       width: auto;
+      transform: translateY(-240%);
+      top: 50%;
     }
 
     /* Ensure time labels are properly positioned */
     .fc .fc-timegrid-slot-label {
-      vertical-align: top;
+      vertical-align: middle;
       text-align: right;
       position: relative;
       padding-right: 8px;
@@ -269,32 +272,96 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     }
 
     /* Event styling */
-    .fc-timegrid-event {
+    .fc-timegrid-event,
+    .fc-daygrid-event {
       border-radius: 12px !important;
       border: none !important;
       padding: 6px 8px !important;
-      margin: 1px 0 !important;
+      margin: 0 0 !important;
       line-height: 1.3 !important;
     }
 
     /* Make events fill the column width */
-    .fc .fc-timegrid-col-events {
+    .fc .fc-timegrid-col-events,
+    .fc .fc-daygrid-day-events {
       margin: 0 !important;
       padding: 0 1px !important;
     }
 
-    .fc-timegrid-event .fc-event-main {
+    .fc-timegrid-event .fc-event-main,
+    .fc-daygrid-event .fc-event-main {
       padding: 2px;
     }
 
-    .fc-timegrid-event .fc-event-title {
+    .fc-timegrid-event .fc-event-title,
+    .fc-daygrid-event .fc-event-title {
       font-weight: 600;
       font-size: 2em;
       color: black;
       margin-bottom: 2px;
     }
 
-    .fc-timegrid-event .fc-event-time {
+    .fc-timegrid-event .fc-event-time,
+    .fc-daygrid-event .fc-event-time {
+      font-size: 2em;
+      color: rgba(0, 0, 0, 0.7);
+      font-weight: 400;
+    }
+
+    /* All-day section styling */
+    .fc .fc-daygrid-day-frame {
+      border-bottom: 2px solid var(--fc-border-color) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    .fc .fc-daygrid-day-events {
+      display: flex !important;
+      flex-direction: column !important;
+      margin: 0 !important;
+    }
+
+    /* Position meal events at the bottom */
+    .fc .fc-daygrid-event[data-event-type="meal"] {
+      order: 2 !important;
+      margin-top: auto !important;
+    }
+
+    .fc .fc-daygrid-event:not([data-event-type="meal"]) {
+      order: 1 !important;
+    }
+
+    /* All-day event styling */
+    .fc-daygrid-block-event {
+      margin: 1px 1px !important;
+      min-height: 30px !important;
+      display: flex !important;
+      align-items: center !important;
+    }
+
+    .fc-daygrid-block-event .fc-event-main-content {
+      padding: 2px;
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+    }
+
+    .fc-daygrid-block-event .fc-event-title {
+      font-weight: 400 !important;
+      font-size: 1.5em !important;
+    }
+
+    /* Regular event styling */
+    .fc-timegrid-event .fc-event-title,
+    .fc-daygrid-dot-event .fc-event-title {
+      font-weight: 600;
+      font-size: 2em;
+      color: black;
+      margin-bottom: 2px;
+    }
+
+    .fc-timegrid-event .fc-event-time,
+    .fc-daygrid-dot-event .fc-event-time {
       font-size: 2em;
       color: rgba(0, 0, 0, 0.7);
       font-weight: 400;
@@ -317,8 +384,8 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     }
 
     .fc .fc-day-today .fc-col-header-cell-cushion {
-      color: var(--primary-color);
-      font-weight: 700;
+      color: black;
+      font-weight: 500;
     }
 
     /* Toolbar buttons */
@@ -355,22 +422,18 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     }
 
     /* Scrollbar styling */
+    .fc-scroller {
+      scrollbar-width: none !important; /* Firefox */
+      -ms-overflow-style: none !important; /* IE and Edge */
+    }
+
     .fc-scroller::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      display: none !important; /* Chrome, Safari and Opera */
     }
 
-    .fc-scroller::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .fc-scroller::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
-    }
-
-    .fc-scroller::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.2);
+    /* Hide license message */
+    .fc-license-message {
+      display: none !important;
     }
   `;
 
@@ -492,7 +555,7 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
         if (type === "meal") {
           return {
             html: `<div class="fc-event-main-content">
-                    <div class="fc-event-title">🍽️ ${title}</div>
+                    <div class="fc-event-title">${title}</div>
                   </div>`,
           };
         }
@@ -528,51 +591,61 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
     // Add meal plan events at the top
     if (this._menuData) {
       events.push(
-        ...this._menuData.map((menu) => ({
-          title: menu.items.join(", "),
-          start: `${menu.date}`,
-          end: `${menu.date}`,
-          backgroundColor: "rgb(255, 243, 224)", // Light yellow for meal events
-          textColor: "black",
-          display: "block",
-          allDay: true,
-          extendedProps: {
-            type: "meal",
-            order: 1,
-          },
-        })),
+        ...this._menuData
+          .filter(
+            (menu) =>
+              menu.items.length > 0 && menu.items.join(", ").trim() !== "",
+          )
+          .map((menu) => ({
+            title: menu.items.join(", "),
+            start: `${menu.date}`,
+            end: `${menu.date}`,
+            backgroundColor: "Gold",
+            textColor: "black",
+            display: "block",
+            allDay: true,
+            classNames: ["meal-event"],
+            extendedProps: {
+              type: "meal",
+              order: 2,
+            },
+            dataEventType: "meal",
+          })),
       );
     }
 
     // Add regular calendar events
     if (this._events) {
       events.push(
-        ...this._events.map((event) => {
-          const isAllDay =
-            (event.start.getHours() === 0 &&
-              event.start.getMinutes() === 0 &&
-              event.end.getHours() === 0 &&
-              event.end.getMinutes() === 0) ||
-            event.end.getTime() - event.start.getTime() >= 24 * 60 * 60 * 1000;
+        ...this._events
+          .filter((event) => event.title !== "-NO SCHOOL-")
+          .map((event) => {
+            const isAllDay =
+              (event.start.getHours() === 0 &&
+                event.start.getMinutes() === 0 &&
+                event.end.getHours() === 0 &&
+                event.end.getMinutes() === 0) ||
+              event.end.getTime() - event.start.getTime() >=
+                24 * 60 * 60 * 1000;
 
-          const backgroundColor = this._getEventClass(event);
+            const backgroundColor = this._getEventClass(event);
 
-          return {
-            title: event.title,
-            start: event.start,
-            end: event.end,
-            allDay: isAllDay,
-            backgroundColor,
-            textColor: "black",
-            extendedProps: {
-              calendar: event.calendar,
-              location: event.location,
-              description: event.description,
-              type: "regular",
-              order: 2,
-            },
-          };
-        }),
+            return {
+              title: event.title,
+              start: event.start,
+              end: event.end,
+              allDay: isAllDay,
+              backgroundColor,
+              textColor: "black",
+              extendedProps: {
+                calendar: event.calendar,
+                location: event.location,
+                description: event.description,
+                type: "regular",
+                order: 2,
+              },
+            };
+          }),
       );
     }
 
@@ -671,15 +744,8 @@ class FamilyCalendarCard extends LitElement implements LovelaceCard {
       }
     }
 
-    // Fall back to calendar-based colors if no filter match
-    const defaultColors = {
-      "calendar.personal": "rgb(3, 155, 229)", // David's blue
-      "calendar.work": "rgb(142, 36, 170)", // Calli's purple
-      "calendar.family": "rgb(51, 182, 121)", // Jess's green
-      "calendar.holidays": "rgb(230, 124, 115)", // Cambria's color
-    };
-
-    return defaultColors[event.calendar] || "rgb(3, 155, 229)"; // Default to blue
+    // Lighter blue color for all calendars if no filter match
+    return "rgb(100, 181, 246)"; // Lighter blue color
   }
 
   render() {
